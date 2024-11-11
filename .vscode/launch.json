@@ -1,0 +1,24 @@
+// .vscode/launch.json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Launch JADE Boot",
+            "request": "launch",
+            "mainClass": "jade.Boot",
+            "args": [
+                "-notmp",
+                "-gui",
+                "-agents",
+                "MainAgent:src.jade_mvr.MainAgent;RandomAgent:src.jade_mvr.RandomAgent;"
+            ],
+            "preLaunchTask": "javac",
+            "classPaths": [
+                "${workspaceFolder}/lib/jade.jar",
+                "${workspaceFolder}/bin/"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}
