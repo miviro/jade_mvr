@@ -11,14 +11,32 @@ import jade.lang.acl.ACLMessage;
 import java.io.PrintStream;
 import java.util.ArrayList;
 
+import javax.swing.UIManager;
+
+import com.formdev.flatlaf.FlatLightLaf;
+
 public class MainAgent extends Agent {
 
     private GUI gui;
     private AID[] playerAgents;
     private GameParametersStruct parameters = new GameParametersStruct();
 
+    
     @Override
     protected void setup() {
+        // Set FlatLaf Look and Feel before initializing GUI
+        try {
+            UIManager.setLookAndFeel(new FlatLightLaf());
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            // Optionally, fallback to default Look and Feel
+            try {
+                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
         gui = new GUI(this);
         System.setOut(new PrintStream(gui.getLoggingOutputStream()));
 

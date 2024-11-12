@@ -1,5 +1,6 @@
 {
     "java.project.referencedLibraries": [
-        "lib/jade.jar"
+        "lib/jade.jar",
+        "lib/flatlaf.jar",
     ]
 }

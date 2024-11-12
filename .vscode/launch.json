@@ -15,7 +15,7 @@
             ],
             "preLaunchTask": "javac",
             "classPaths": [
-                "${workspaceFolder}/lib/jade.jar",
+                "${workspaceFolder}/lib/*",
                 "${workspaceFolder}/bin/"
             ],
             "console": "integratedTerminal"

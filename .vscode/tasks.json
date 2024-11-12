@@ -12,7 +12,7 @@
                 "-d",
                 "bin/",
                 "-cp",
-                "lib/jade.jar",
+                "lib/*",
                 "src/jade_mvr/*.java"
             ],
             "group": {
