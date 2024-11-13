@@ -12,6 +12,8 @@ import jade.lang.acl.ACLMessage;
 import java.io.PrintStream;
 import java.util.ArrayList;
 
+import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 import javax.swing.UIManager;
 
 import com.formdev.flatlaf.FlatLightLaf;
@@ -21,7 +23,6 @@ public class MainAgent extends Agent {
     private GUI gui;
     private AID[] playerAgents;
     private GameParametersStruct parameters = new GameParametersStruct();
-
 
     public GameParametersStruct getParameters() {
         return parameters;
@@ -57,11 +58,82 @@ public class MainAgent extends Agent {
     }
 
     public void runAllRounds() {
-        gui.logLine("Running all rounds");
+        runXRounds(parameters.R);
     }
 
+    // Semaphore fields
+    private final Object semaphoreLock = new Object();
+    private volatile boolean canProceed = true;
+
     public void runXRounds(int rounds) {
+        // Disable buttons and enable stopButton on EDT
+        SwingUtilities.invokeLater(() -> {
+            gui.newGameButton.setEnabled(false);
+            gui.runAllRoundsButton.setEnabled(false);
+            gui.runXRoundsButton.setEnabled(false);
+            gui.stopButton.setEnabled(true);
+        });
+
         gui.logLine("Running " + rounds + " rounds");
+
+        // Use SwingWorker for background processing
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                for (int i = 0; i < 4; i++) {
+                    // Check the semaphore before proceeding
+                    synchronized (semaphoreLock) {
+                        while (!canProceed) {
+                            semaphoreLock.wait();
+                        }
+                    }
+                    gui.logLine("Running round " + (i + 1));   
+                    // Perform the round
+                    Thread.sleep(2000);
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                gui.logLine("All rounds finished");
+                SwingUtilities.invokeLater(() -> {
+                    gui.newGameButton.setEnabled(true);
+                    gui.runAllRoundsButton.setEnabled(true);
+                    gui.runXRoundsButton.setEnabled(true);
+                    gui.stopButton.setEnabled(false);
+                });
+            }
+        };
+
+        worker.execute();
+    }
+
+    public void stopGame() {
+        gui.logLine("Stopping");
+        synchronized (semaphoreLock) {
+            canProceed = false;
+        }
+        SwingUtilities.invokeLater(() -> {
+            gui.runAllRoundsButton.setEnabled(true);
+            gui.runXRoundsButton.setEnabled(true);
+            gui.continueButton.setEnabled(true);
+            gui.stopButton.setEnabled(false);
+        });
+    }
+
+    public void continueGame() {
+        gui.logLine("Continuing");
+        synchronized (semaphoreLock) {
+            canProceed = true;
+            semaphoreLock.notifyAll();
+        }
+        SwingUtilities.invokeLater(() -> {
+            gui.runAllRoundsButton.setEnabled(false);
+            gui.runXRoundsButton.setEnabled(false);
+            gui.continueButton.setEnabled(false);
+            gui.stopButton.setEnabled(true);
+        });
     }
 
     public int updatePlayers() {
@@ -92,6 +164,11 @@ public class MainAgent extends Agent {
     }
 
     public int newGame() {
+        SwingUtilities.invokeLater(() -> {
+            gui.runAllRoundsButton.setEnabled(true);
+            gui.runXRoundsButton.setEnabled(true);
+        });
+
         addBehaviour(new GameManager());
         return 0;
     }
@@ -204,8 +281,8 @@ public class MainAgent extends Agent {
         @Override
         public String toString() {
             return "N=" + N +
-            ", S=" + S +
-            ", R=" + R +
+                    ", S=" + S +
+                    ", R=" + R +
                     ", I=" + I;
         }
     }

@@ -31,13 +31,13 @@ public final class GUI extends JFrame implements ActionListener {
     private final Color secondaryColor = new Color(0xECF0F1); // Light Grey
     private final Color accentColor = new Color(0x3498DB); // Bright Blue
 
-    private boolean newGameLoaded = false;
-    public void setNewGameLoaded(boolean newGameLoaded) {
-        this.newGameLoaded = newGameLoaded;
-    }
-    public boolean getNewGameLoaded() {
-        return this.newGameLoaded;
-    }
+    JButton  stopButton = createToolbarButton("Stop", "stop_icon.png");
+    JButton continueButton = createToolbarButton("Continue", "continue_icon.png");
+    JButton runAllRoundsButton = createToolbarButton("Run All Rounds", "run_all_rounds_icon.png");
+    JSpinner roundsSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+    JButton runXRoundsButton = createToolbarButton("Run X Rounds", "run_x_rounds_icon.png");
+    JButton newGameButton = createToolbarButton("New Game", "new_game_icon.png");
+
 
     public GUI() {
         initUI();
@@ -51,7 +51,8 @@ public final class GUI extends JFrame implements ActionListener {
 
     public void log(String s) {
         Runnable appendLine = () -> {
-            rightPanelLoggingTextArea.append('[' + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) + "] - " + s + "\n");
+            rightPanelLoggingTextArea.append(
+                    '[' + LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")) + "] - " + s + "\n");
             rightPanelLoggingTextArea.setCaretPosition(rightPanelLoggingTextArea.getDocument().getLength());
         };
         SwingUtilities.invokeLater(appendLine);
@@ -114,7 +115,8 @@ public final class GUI extends JFrame implements ActionListener {
         pane.add(createToolBar(), BorderLayout.NORTH);
 
         // Split Pane for main content
-        JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, createLeftPanel(), createCenterPanel(null));
+        JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, createLeftPanel(),
+                createCenterPanel(null));
         mainSplitPane.setResizeWeight(0.2);
         mainSplitPane.setOneTouchExpandable(true);
         pane.add(mainSplitPane, BorderLayout.CENTER);
@@ -130,34 +132,24 @@ public final class GUI extends JFrame implements ActionListener {
         toolBar.setFloatable(false);
         toolBar.setBackground(primaryColor);
 
-        JButton stopButton = createToolbarButton("Stop", "stop_icon.png");
-        JButton continueButton = createToolbarButton("Continue", "continue_icon.png");
-
-        JButton newGameButton = createToolbarButton("New Game", "new_game_icon.png");
         newGameButton.setToolTipText("Start a new game");
         newGameButton.addActionListener(actionEvent -> {
-            newGameLoaded = true;
-
-            continueButton.setEnabled(false);
-            stopButton.setEnabled(true);
-
             mainAgent.newGame();
-            logLine("Starting new game with params: " + mainAgent.getParameters().toString() + " Press 'Run All Rounds' or 'Run X rounds' to start.");
+            logLine("Starting new game with params: " + mainAgent.getParameters().toString()
+                    + " Press 'Run All Rounds' or 'Run X rounds' to start.");
         });
 
-        JButton runAllRoundsButton = createToolbarButton("Run All Rounds", "run_all_rounds_icon.png");
         runAllRoundsButton.setToolTipText("Run all rounds of the game");
+        runAllRoundsButton.setEnabled(false);
         runAllRoundsButton.addActionListener(actionEvent -> {
+
             mainAgent.runAllRounds();
         });
 
-
-        JSpinner roundsSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
         roundsSpinner.setPreferredSize(new Dimension(5, 25));
 
-
-        JButton runXRoundsButton = createToolbarButton("Run X Rounds", "run_x_rounds_icon.png");
         runXRoundsButton.setToolTipText("Run a specified number of rounds");
+        runXRoundsButton.setEnabled(false);
         runXRoundsButton.addActionListener(actionEvent -> {
             int rounds = (int) roundsSpinner.getValue();
             mainAgent.runXRounds(rounds);
@@ -165,23 +157,15 @@ public final class GUI extends JFrame implements ActionListener {
 
         stopButton.setToolTipText("Stop the current game");
         stopButton.addActionListener(actionEvent -> {
-            if (newGameLoaded) {
-            stopButton.setEnabled(false);
-            continueButton.setEnabled(true);
-            handleButtonAction("Stop");
-            }
+            mainAgent.stopGame();
         });
 
         continueButton.setToolTipText("Continue the game");
         continueButton.addActionListener(actionEvent -> {
-            if (newGameLoaded) {
-            continueButton.setEnabled(false);
-            stopButton.setEnabled(true);
-            handleButtonAction("Continue");
-            }
+            mainAgent.continueGame();
         });
 
-        stopButton.setEnabled(newGameLoaded);
+        stopButton.setEnabled(false);
         continueButton.setEnabled(false);
 
         toolBar.add(newGameButton);
@@ -206,27 +190,26 @@ public final class GUI extends JFrame implements ActionListener {
         button.setForeground(Color.WHITE);
         button.setBorder(new CompoundBorder(
                 new LineBorder(primaryColor, 1, true),
-                new EmptyBorder(5, 15, 5, 15)
-        ));
+                new EmptyBorder(5, 15, 5, 15)));
         button.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         // Optionally add icons if available
         /*
-        try {
-            ImageIcon icon = new ImageIcon(getClass().getResource("/icons/" + iconPath));
-            button.setIcon(icon);
-        } catch (Exception e) {
-            // Handle missing icon
-        }
-        */
+         * try {
+         * ImageIcon icon = new ImageIcon(getClass().getResource("/icons/" + iconPath));
+         * button.setIcon(icon);
+         * } catch (Exception e) {
+         * // Handle missing icon
+         * }
+         */
         return button;
     }
 
     private JPanel createLeftPanel() {
         JPanel leftPanel = new JPanel(new BorderLayout(10, 10));
         leftPanel.setBorder(new CompoundBorder(
-                new TitledBorder(new LineBorder(primaryColor, 2, true), "Players", TitledBorder.LEFT, TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 16), primaryColor),
-                new EmptyBorder(10, 10, 10, 10)
-        ));
+                new TitledBorder(new LineBorder(primaryColor, 2, true), "Players", TitledBorder.LEFT, TitledBorder.TOP,
+                        new Font("Segoe UI", Font.BOLD, 16), primaryColor),
+                new EmptyBorder(10, 10, 10, 10)));
         leftPanel.setBackground(secondaryColor);
 
         // Top Info Panel
@@ -243,8 +226,8 @@ public final class GUI extends JFrame implements ActionListener {
         leftPanelExtraInformation.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         leftPanelExtraInformation.setForeground(primaryColor);
         leftPanelExtraInformation.setAlignmentX(Component.LEFT_ALIGNMENT);
-            String params = mainAgent.getParameters().toString();
-            leftPanelExtraInformation.setText("Parameters: " + params);
+        String params = mainAgent.getParameters().toString();
+        leftPanelExtraInformation.setText("Parameters: " + params);
 
         infoPanel.add(leftPanelRoundsLabel);
         infoPanel.add(Box.createVerticalStrut(10));
@@ -300,13 +283,14 @@ public final class GUI extends JFrame implements ActionListener {
     }
 
     private JPanel createCenterPanel(Object[][] data) {
-        String[] columns = {"Players", "Score", "Wins", "Losses", "Draws", "Points", "Rank", "Status", "Last", "Remarks"};
-       
+        String[] columns = { "Players", "Score", "Wins", "Losses", "Draws", "Points", "Rank", "Status", "Last",
+                "Remarks" };
+
         JPanel centerPanel = new JPanel(new BorderLayout(columns.length, columns.length));
         centerPanel.setBorder(new CompoundBorder(
-                new TitledBorder(new LineBorder(primaryColor, 2, true), "Player Results", TitledBorder.LEFT, TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 16), primaryColor),
-                new EmptyBorder(columns.length, columns.length, columns.length, columns.length)
-        ));
+                new TitledBorder(new LineBorder(primaryColor, 2, true), "Player Results", TitledBorder.LEFT,
+                        TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 16), primaryColor),
+                new EmptyBorder(columns.length, columns.length, columns.length, columns.length)));
         centerPanel.setBackground(secondaryColor);
 
         // Player Results Table
@@ -356,9 +340,9 @@ public final class GUI extends JFrame implements ActionListener {
     private JPanel createLogPanel() {
         JPanel logPanel = new JPanel(new BorderLayout(10, 10));
         logPanel.setBorder(new CompoundBorder(
-                new TitledBorder(new LineBorder(primaryColor, 2, true), "Log", TitledBorder.LEFT, TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 16), primaryColor),
-                new EmptyBorder(10, 10, 10, 10)
-        ));
+                new TitledBorder(new LineBorder(primaryColor, 2, true), "Log", TitledBorder.LEFT, TitledBorder.TOP,
+                        new Font("Segoe UI", Font.BOLD, 16), primaryColor),
+                new EmptyBorder(10, 10, 10, 10)));
         logPanel.setBackground(secondaryColor);
 
         rightPanelLoggingTextArea = new JTextArea(8, 50);
@@ -440,7 +424,8 @@ public final class GUI extends JFrame implements ActionListener {
             panel.add(new JLabel("Inflation rate (I%):"));
             panel.add(iField);
 
-            int result = JOptionPane.showConfirmDialog(this, panel, "Enter Parameters", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            int result = JOptionPane.showConfirmDialog(this, panel, "Enter Parameters", JOptionPane.OK_CANCEL_OPTION,
+                    JOptionPane.PLAIN_MESSAGE);
             if (result == JOptionPane.OK_OPTION) {
                 try {
                     int n = ((Number) nField.getValue()).intValue();
@@ -471,19 +456,19 @@ public final class GUI extends JFrame implements ActionListener {
         aboutMenuItem.setToolTipText("Show information about the application");
         aboutMenuItem.addActionListener(actionEvent -> {
             String message = "<html>Author: Miguel Vila Rodríguez<br>Date: 13-11-2024<br>" +
-            "Website: <a href='https://miviro.es'>https://miviro.es</a><br>" +
-            "GitHub: <a href='https://github.com/miviro/jade_mvr'>https://github.com/miviro/jade_mvr</a></html>";
+                    "Website: <a href='https://miviro.es'>https://miviro.es</a><br>" +
+                    "GitHub: <a href='https://github.com/miviro/jade_mvr'>https://github.com/miviro/jade_mvr</a></html>";
             JEditorPane editorPane = new JEditorPane("text/html", message);
             editorPane.setEditable(false);
             editorPane.setOpaque(false);
             editorPane.addHyperlinkListener(e -> {
-            if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                try {
-                Desktop.getDesktop().browse(new URI(e.getURL().toString()));
-                } catch (Exception ex) {
-                ex.printStackTrace();
+                if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+                    try {
+                        Desktop.getDesktop().browse(new URI(e.getURL().toString()));
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
                 }
-            }
             });
             JOptionPane.showMessageDialog(this, editorPane, "About", JOptionPane.INFORMATION_MESSAGE);
         });
