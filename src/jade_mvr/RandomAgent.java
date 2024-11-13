@@ -15,7 +15,7 @@ public class RandomAgent extends Agent {
     private State state;
     private AID mainAgent;
     private int myId, opponentId;
-    private int N, S, R, I, P;
+    private int N, S, R;
     private ACLMessage msg;
 
     protected void setup() {
@@ -144,7 +144,7 @@ public class RandomAgent extends Agent {
          * @return true on success, false on failure
          */
         private boolean validateSetupMessage(ACLMessage msg) throws NumberFormatException {
-            int tN, tS, tR, tI, tP, tMyId;
+            int tN, tS, tR, tMyId;
             String msgContent = msg.getContent();
 
             String[] contentSplit = msgContent.split("#");
@@ -157,16 +157,12 @@ public class RandomAgent extends Agent {
             tN = Integer.parseInt(parametersSplit[0]);
             tS = Integer.parseInt(parametersSplit[1]);
             tR = Integer.parseInt(parametersSplit[2]);
-            tI = Integer.parseInt(parametersSplit[3]);
-            tP = Integer.parseInt(parametersSplit[4]);
 
             //At this point everything should be fine, updating class variables
             mainAgent = msg.getSender();
             N = tN;
             S = tS;
             R = tR;
-            I = tI;
-            P = tP;
             myId = tMyId;
             return true;
         }

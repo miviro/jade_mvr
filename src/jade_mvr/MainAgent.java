@@ -1,4 +1,5 @@
 package src.jade_mvr;
+
 import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.SimpleBehaviour;
@@ -21,7 +22,18 @@ public class MainAgent extends Agent {
     private AID[] playerAgents;
     private GameParametersStruct parameters = new GameParametersStruct();
 
-    
+
+    public GameParametersStruct getParameters() {
+        return parameters;
+    }
+
+    public void setParameters(int N, int R, int S, int I) {
+        parameters.N = N;
+        parameters.R = R;
+        parameters.S = S;
+        parameters.I = I;
+    }
+
     @Override
     protected void setup() {
         // Set FlatLaf Look and Feel before initializing GUI
@@ -44,6 +56,14 @@ public class MainAgent extends Agent {
         gui.logLine("Agent " + getAID().getName() + " is ready.");
     }
 
+    public void runAllRounds() {
+        gui.logLine("Running all rounds");
+    }
+
+    public void runXRounds(int rounds) {
+        gui.logLine("Running " + rounds + " rounds");
+    }
+
     public int updatePlayers() {
         gui.logLine("Updating player list");
         DFAgentDescription template = new DFAgentDescription();
@@ -62,7 +82,7 @@ public class MainAgent extends Agent {
         } catch (FIPAException fe) {
             gui.logLine(fe.getMessage());
         }
-        //Provisional
+        // Provisional
         String[] playerNames = new String[playerAgents.length];
         for (int i = 0; i < playerAgents.length; i++) {
             playerNames[i] = playerAgents[i].getName();
@@ -84,30 +104,30 @@ public class MainAgent extends Agent {
 
         @Override
         public void action() {
-            //Assign the IDs
+            // Assign the IDs
             ArrayList<PlayerInformation> players = new ArrayList<>();
             int lastId = 0;
             for (AID a : playerAgents) {
                 players.add(new PlayerInformation(a, lastId++));
             }
 
-            //Initialize (inform ID)
+            // Initialize (inform ID)
             for (PlayerInformation player : players) {
                 ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-                msg.setContent("Id#" + player.id + "#" + parameters.N + "," + parameters.S + "," + parameters.R + "," + parameters.I + "," + parameters.P);
+                msg.setContent("Id#" + player.id + "#" + parameters.N + "," + parameters.R + "," + parameters.S);
                 msg.addReceiver(player.aid);
                 send(msg);
             }
-            //Organize the matches
+            // Organize the matches
             for (int i = 0; i < players.size(); i++) {
-                for (int j = i + 1; j < players.size(); j++) { //too lazy to think, let's see if it works or it breaks
+                for (int j = i + 1; j < players.size(); j++) { // too lazy to think, let's see if it works or it breaks
                     playGame(players.get(i), players.get(j));
                 }
             }
         }
 
         private void playGame(PlayerInformation player1, PlayerInformation player2) {
-            //Assuming player1.id < player2.id
+            // Assuming player1.id < player2.id
             ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
             msg.addReceiver(player1.aid);
             msg.addReceiver(player2.aid);
@@ -170,17 +190,23 @@ public class MainAgent extends Agent {
     public class GameParametersStruct {
 
         int N;
-        int S;
         int R;
+        int S;
         int I;
-        int P;
 
         public GameParametersStruct() {
             N = 2;
-            S = 4;
             R = 50;
+            S = 4;
             I = 0;
-            P = 10;
+        }
+
+        @Override
+        public String toString() {
+            return "N=" + N +
+            ", S=" + S +
+            ", R=" + R +
+                    ", I=" + I;
         }
     }
 }

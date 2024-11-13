@@ -1,12 +1,20 @@
 package src.jade_mvr;
 
 import com.formdev.flatlaf.FlatLightLaf;
+
+import src.jade_mvr.MainAgent.GameParametersStruct;
+
 import javax.swing.*;
 import javax.swing.border.*;
+import javax.swing.event.HyperlinkEvent;
+import javax.swing.text.NumberFormatter;
+
 import java.awt.*;
 import java.awt.event.*;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URI;
+import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -22,6 +30,14 @@ public final class GUI extends JFrame implements ActionListener {
     private final Color primaryColor = new Color(0x2C3E50); // Dark Blue
     private final Color secondaryColor = new Color(0xECF0F1); // Light Grey
     private final Color accentColor = new Color(0x3498DB); // Bright Blue
+
+    private boolean newGameLoaded = false;
+    public void setNewGameLoaded(boolean newGameLoaded) {
+        this.newGameLoaded = newGameLoaded;
+    }
+    public boolean getNewGameLoaded() {
+        return this.newGameLoaded;
+    }
 
     public GUI() {
         initUI();
@@ -98,7 +114,7 @@ public final class GUI extends JFrame implements ActionListener {
         pane.add(createToolBar(), BorderLayout.NORTH);
 
         // Split Pane for main content
-        JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, createLeftPanel(), createCenterPanel());
+        JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, createLeftPanel(), createCenterPanel(null));
         mainSplitPane.setResizeWeight(0.2);
         mainSplitPane.setOneTouchExpandable(true);
         pane.add(mainSplitPane, BorderLayout.CENTER);
@@ -114,23 +130,68 @@ public final class GUI extends JFrame implements ActionListener {
         toolBar.setFloatable(false);
         toolBar.setBackground(primaryColor);
 
+        JButton stopButton = createToolbarButton("Stop", "stop_icon.png");
+        JButton continueButton = createToolbarButton("Continue", "continue_icon.png");
+
         JButton newGameButton = createToolbarButton("New Game", "new_game_icon.png");
         newGameButton.setToolTipText("Start a new game");
         newGameButton.addActionListener(actionEvent -> {
+            newGameLoaded = true;
+
+            continueButton.setEnabled(false);
+            stopButton.setEnabled(true);
+
             mainAgent.newGame();
-            logLine("New Game initiated.");
+            logLine("Starting new game with params: " + mainAgent.getParameters().toString() + " Press 'Run All Rounds' or 'Run X rounds' to start.");
         });
 
-        JButton stopButton = createToolbarButton("Stop", "stop_icon.png");
-        stopButton.setToolTipText("Stop the current game");
-        stopButton.addActionListener(this);
+        JButton runAllRoundsButton = createToolbarButton("Run All Rounds", "run_all_rounds_icon.png");
+        runAllRoundsButton.setToolTipText("Run all rounds of the game");
+        runAllRoundsButton.addActionListener(actionEvent -> {
+            mainAgent.runAllRounds();
+        });
 
-        JButton continueButton = createToolbarButton("Continue", "continue_icon.png");
+
+        JSpinner roundsSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
+        roundsSpinner.setPreferredSize(new Dimension(5, 25));
+
+
+        JButton runXRoundsButton = createToolbarButton("Run X Rounds", "run_x_rounds_icon.png");
+        runXRoundsButton.setToolTipText("Run a specified number of rounds");
+        runXRoundsButton.addActionListener(actionEvent -> {
+            int rounds = (int) roundsSpinner.getValue();
+            mainAgent.runXRounds(rounds);
+        });
+
+        stopButton.setToolTipText("Stop the current game");
+        stopButton.addActionListener(actionEvent -> {
+            if (newGameLoaded) {
+            stopButton.setEnabled(false);
+            continueButton.setEnabled(true);
+            handleButtonAction("Stop");
+            }
+        });
+
         continueButton.setToolTipText("Continue the game");
-        continueButton.addActionListener(this);
+        continueButton.addActionListener(actionEvent -> {
+            if (newGameLoaded) {
+            continueButton.setEnabled(false);
+            stopButton.setEnabled(true);
+            handleButtonAction("Continue");
+            }
+        });
+
+        stopButton.setEnabled(newGameLoaded);
+        continueButton.setEnabled(false);
 
         toolBar.add(newGameButton);
         toolBar.addSeparator(new Dimension(10, 0));
+        toolBar.add(runAllRoundsButton);
+        toolBar.addSeparator(new Dimension(10, 0));
+
+        toolBar.add(runXRoundsButton);
+        toolBar.add(roundsSpinner);
+        toolBar.addSeparator(new Dimension(950, 0));
         toolBar.add(stopButton);
         toolBar.addSeparator(new Dimension(10, 0));
         toolBar.add(continueButton);
@@ -182,12 +243,21 @@ public final class GUI extends JFrame implements ActionListener {
         leftPanelExtraInformation.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         leftPanelExtraInformation.setForeground(primaryColor);
         leftPanelExtraInformation.setAlignmentX(Component.LEFT_ALIGNMENT);
+            String params = mainAgent.getParameters().toString();
+            leftPanelExtraInformation.setText("Parameters: " + params);
 
         infoPanel.add(leftPanelRoundsLabel);
         infoPanel.add(Box.createVerticalStrut(10));
         infoPanel.add(leftPanelExtraInformation);
 
         leftPanel.add(infoPanel, BorderLayout.NORTH);
+
+        infoPanel.add(Box.createVerticalStrut(10));
+        JLabel agentsFoundLabel = new JLabel("Agents found:");
+        agentsFoundLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        agentsFoundLabel.setForeground(primaryColor);
+        agentsFoundLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        infoPanel.add(agentsFoundLabel);
 
         // Player List
         DefaultListModel<String> listModel = new DefaultListModel<>();
@@ -229,21 +299,19 @@ public final class GUI extends JFrame implements ActionListener {
         return leftPanel;
     }
 
-    private JPanel createCenterPanel() {
-        JPanel centerPanel = new JPanel(new BorderLayout(10, 10));
+    private JPanel createCenterPanel(Object[][] data) {
+        String[] columns = {"Players", "Score", "Wins", "Losses", "Draws", "Points", "Rank", "Status", "Last", "Remarks"};
+       
+        JPanel centerPanel = new JPanel(new BorderLayout(columns.length, columns.length));
         centerPanel.setBorder(new CompoundBorder(
                 new TitledBorder(new LineBorder(primaryColor, 2, true), "Player Results", TitledBorder.LEFT, TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 16), primaryColor),
-                new EmptyBorder(10, 10, 10, 10)
+                new EmptyBorder(columns.length, columns.length, columns.length, columns.length)
         ));
         centerPanel.setBackground(secondaryColor);
 
         // Player Results Table
-        String[] columns = {"Player", "Score", "Wins", "Losses", "Draws", "Points", "Rank", "Status", "Actions", "Remarks"};
-        Object[][] data = new Object[10][10];
-        for (int i = 0; i < data.length; i++) {
-            data[i] = new Object[]{
-                "Player " + (i + 1), "0", "0", "0", "0", "0", "Unranked", "Active", "N/A", "N/A"
-            };
+        if (data == null) {
+            data = new Object[0][columns.length];
         }
 
         JTable payoffTable = new JTable(data, columns) {
@@ -313,21 +381,13 @@ public final class GUI extends JFrame implements ActionListener {
     private JMenuBar createMainMenuBar() {
         JMenuBar menuBar = new JMenuBar();
         menuBar.setBackground(primaryColor);
-        menuBar.setForeground(Color.WHITE);
+        menuBar.setForeground(Color.BLACK);
 
         // File Menu
         JMenu menuFile = new JMenu("File");
         menuFile.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         menuFile.setForeground(Color.WHITE);
         menuFile.setMnemonic(KeyEvent.VK_F);
-
-        JMenuItem newGameFileMenu = new JMenuItem("New Game");
-        newGameFileMenu.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        newGameFileMenu.setToolTipText("Start a new game");
-        newGameFileMenu.addActionListener(actionEvent -> {
-            mainAgent.newGame();
-            logLine("New Game initiated via menu.");
-        });
 
         JMenuItem exitFileMenu = new JMenuItem("Exit");
         exitFileMenu.setFont(new Font("Segoe UI", Font.PLAIN, 14));
@@ -338,8 +398,6 @@ public final class GUI extends JFrame implements ActionListener {
             System.exit(0);
         });
 
-        menuFile.add(newGameFileMenu);
-        menuFile.addSeparator();
         menuFile.add(exitFileMenu);
         menuBar.add(menuFile);
 
@@ -359,9 +417,44 @@ public final class GUI extends JFrame implements ActionListener {
         parametersEditMenu.setFont(new Font("Segoe UI", Font.PLAIN, 14));
         parametersEditMenu.setToolTipText("Modify the parameters of the game");
         parametersEditMenu.addActionListener(actionEvent -> {
-            String params = JOptionPane.showInputDialog(this, "Enter parameters N,S,R,I,P");
-            if (params != null && !params.trim().isEmpty()) {
-                logLine("Parameters set to: " + params);
+            // Retrieve current parameters
+            GameParametersStruct params = mainAgent.getParameters();
+
+            // Create number-only formatted text fields with default values
+            JFormattedTextField nField = new JFormattedTextField(new NumberFormatter(new DecimalFormat("#")));
+            nField.setValue(params.N);
+            JFormattedTextField sField = new JFormattedTextField(new NumberFormatter(new DecimalFormat("#")));
+            sField.setValue(params.S);
+            JFormattedTextField rField = new JFormattedTextField(new NumberFormatter(new DecimalFormat("#")));
+            rField.setValue(params.R);
+            JFormattedTextField iField = new JFormattedTextField(new NumberFormatter(new DecimalFormat("#")));
+            iField.setValue(params.I);
+
+            JPanel panel = new JPanel(new GridLayout(4, 2, 10, 10));
+            panel.add(new JLabel("Number of players (N):"));
+            panel.add(nField);
+            panel.add(new JLabel("Stock exchange fee (S%):"));
+            panel.add(sField);
+            panel.add(new JLabel("Number of rounds (R):"));
+            panel.add(rField);
+            panel.add(new JLabel("Inflation rate (I%):"));
+            panel.add(iField);
+
+            int result = JOptionPane.showConfirmDialog(this, panel, "Enter Parameters", JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+            if (result == JOptionPane.OK_OPTION) {
+                try {
+                    int n = ((Number) nField.getValue()).intValue();
+                    int s = ((Number) sField.getValue()).intValue();
+                    int r = ((Number) rField.getValue()).intValue();
+                    int i = ((Number) iField.getValue()).intValue();
+
+                    mainAgent.setParameters(n, r, s, i);
+                    leftPanelExtraInformation.setText("Parameters: N=" + n + ", S=" + s + ", R=" + r + ", I=" + i);
+
+                    logLine("Parameters set to: N=" + n + ", S=" + s + ", R=" + r + ", I=" + i);
+                } catch (Exception e) {
+                    logLine("Invalid input for parameters.");
+                }
             } else {
                 logLine("Parameters input canceled or empty.");
             }
@@ -371,62 +464,31 @@ public final class GUI extends JFrame implements ActionListener {
         menuEdit.add(parametersEditMenu);
         menuBar.add(menuEdit);
 
-        // Run Menu
-        JMenu menuRun = new JMenu("Run");
-        menuRun.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        menuRun.setForeground(Color.WHITE);
-        menuRun.setMnemonic(KeyEvent.VK_R);
-
-        JMenuItem newRunMenu = new JMenuItem("New");
-        newRunMenu.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        newRunMenu.setToolTipText("Starts a new series of games");
-        newRunMenu.addActionListener(this);
-
-        JMenuItem stopRunMenu = new JMenuItem("Stop");
-        stopRunMenu.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        stopRunMenu.setToolTipText("Stops the execution of the current round");
-        stopRunMenu.addActionListener(this);
-
-        JMenuItem continueRunMenu = new JMenuItem("Continue");
-        continueRunMenu.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        continueRunMenu.setToolTipText("Resume the execution");
-        continueRunMenu.addActionListener(this);
-
-        JMenuItem roundNumberRunMenu = new JMenuItem("Number of Rounds");
-        roundNumberRunMenu.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        roundNumberRunMenu.setToolTipText("Change the number of rounds");
-        roundNumberRunMenu.addActionListener(actionEvent -> {
-            String rounds = JOptionPane.showInputDialog(this, "How many rounds?");
-            if (rounds != null && !rounds.trim().isEmpty()) {
-                logLine(rounds + " rounds set.");
-            } else {
-                logLine("Round number input canceled or empty.");
+        // About
+        // TODO: quitar margenes a los lados
+        JMenuItem aboutMenuItem = new JMenuItem("About");
+        aboutMenuItem.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        aboutMenuItem.setToolTipText("Show information about the application");
+        aboutMenuItem.addActionListener(actionEvent -> {
+            String message = "<html>Author: Miguel Vila Rodríguez<br>Date: 13-11-2024<br>" +
+            "Website: <a href='https://miviro.es'>https://miviro.es</a><br>" +
+            "GitHub: <a href='https://github.com/miviro/jade_mvr'>https://github.com/miviro/jade_mvr</a></html>";
+            JEditorPane editorPane = new JEditorPane("text/html", message);
+            editorPane.setEditable(false);
+            editorPane.setOpaque(false);
+            editorPane.addHyperlinkListener(e -> {
+            if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+                try {
+                Desktop.getDesktop().browse(new URI(e.getURL().toString()));
+                } catch (Exception ex) {
+                ex.printStackTrace();
+                }
             }
+            });
+            JOptionPane.showMessageDialog(this, editorPane, "About", JOptionPane.INFORMATION_MESSAGE);
         });
 
-        menuRun.add(newRunMenu);
-        menuRun.add(stopRunMenu);
-        menuRun.add(continueRunMenu);
-        menuRun.addSeparator();
-        menuRun.add(roundNumberRunMenu);
-        menuBar.add(menuRun);
-
-        // Window Menu
-        JMenu menuWindow = new JMenu("Window");
-        menuWindow.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        menuWindow.setForeground(Color.WHITE);
-        menuWindow.setMnemonic(KeyEvent.VK_W);
-
-        JCheckBoxMenuItem toggleVerboseWindowMenu = new JCheckBoxMenuItem("Verbose", true);
-        toggleVerboseWindowMenu.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        toggleVerboseWindowMenu.setToolTipText("Toggle verbose logging");
-        toggleVerboseWindowMenu.addActionListener(actionEvent -> {
-            rightPanelLoggingTextArea.setVisible(toggleVerboseWindowMenu.isSelected());
-            logLine("Verbose logging " + (toggleVerboseWindowMenu.isSelected() ? "enabled." : "disabled."));
-        });
-
-        menuWindow.add(toggleVerboseWindowMenu);
-        menuBar.add(menuWindow);
+        menuBar.add(aboutMenuItem);
 
         return menuBar;
     }
@@ -434,7 +496,7 @@ public final class GUI extends JFrame implements ActionListener {
     @Override
     public void actionPerformed(ActionEvent e) {
         Object source = e.getSource();
-
+        // Solo entra aqui si se pulsa el boton de reset players
         if (source instanceof JButton) {
             JButton button = (JButton) source;
             logLine("Button clicked: " + button.getText());
@@ -463,28 +525,9 @@ public final class GUI extends JFrame implements ActionListener {
 
     private void handleMenuAction(String action) {
         switch (action) {
-            case "New":
-            case "New Game":
-                mainAgent.newGame();
-                logLine("New Game initiated via menu/button.");
-                break;
-            case "Stop":
-                logLine("Game stopped via menu.");
-                // Implement stop logic here
-                break;
-            case "Continue":
-                logLine("Game continued via menu.");
-                // Implement continue logic here
-                break;
             case "Reset Players":
                 // Implement reset players logic here
                 logLine("Players have been reset.");
-                break;
-            case "Parameters":
-                // Handled in action listener
-                break;
-            case "Number of Rounds":
-                // Handled in action listener
                 break;
             case "Exit":
                 logLine("Application exiting via menu.");
