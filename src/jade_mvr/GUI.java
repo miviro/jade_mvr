@@ -19,7 +19,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public final class GUI extends JFrame implements ActionListener {
-    private JLabel leftPanelRoundsLabel;
     private JLabel leftPanelExtraInformation;
     private JList<String> list;
     private MainAgent mainAgent;
@@ -39,6 +38,7 @@ public final class GUI extends JFrame implements ActionListener {
     JSpinner roundsSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
     JButton runXRoundsButton = createToolbarButton("Run X Rounds", "run_x_rounds_icon.png");
     JButton newGameButton = createToolbarButton("New Game", "new_game_icon.png");
+    JLabel leftPanelRoundsLabel;
     JPanel centerPanel;
 
     public GUI() {

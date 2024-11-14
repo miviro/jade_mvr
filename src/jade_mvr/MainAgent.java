@@ -18,8 +18,6 @@ import java.awt.Font;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
-
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.SwingUtilities;
@@ -32,6 +30,8 @@ import com.formdev.flatlaf.FlatLightLaf;
 public class MainAgent extends Agent {
     private List<PlayerData> playerDataList = new ArrayList<>();
     private GameManager gameManager;
+    private int maxExecRound = 0;
+    private int currentRound = 0;
 
     private Object[][] getPlayerDataArray() {
         Object[][] dataArray = new Object[playerDataList.size()][gui.columns.length];
@@ -126,7 +126,8 @@ public class MainAgent extends Agent {
     }
 
     // Semaphore fields
-    private final Object semaphoreLock = new Object();
+    private final Object startstopSemaphore = new Object();
+    private final Object roundSemaphore = new Object();
     private volatile boolean canProceed = true;
 
     public void runXRounds(int rounds) {
@@ -145,23 +146,21 @@ public class MainAgent extends Agent {
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
             @Override
             protected Void doInBackground() throws Exception {
-                for (int i = 0; i < rounds; i++) {
-                    // Check the semaphore before proceeding
-                    synchronized (semaphoreLock) {
-                        while (!canProceed) {
-                            semaphoreLock.wait();
-                        }
+                // Check the semaphore before proceeding
+                synchronized (startstopSemaphore) {
+                    while (!canProceed) {
+                        startstopSemaphore.wait();
                     }
-                    gui.logLine("Running round " + (i + 1));
-                    // Perform the round
-                    Thread.sleep(2000);
+                }
+                maxExecRound = currentRound + rounds;
+                synchronized (roundSemaphore) {
+                    roundSemaphore.notifyAll();
                 }
                 return null;
             }
 
             @Override
             protected void done() {
-                gui.logLine("All rounds finished");
                 SwingUtilities.invokeLater(() -> {
                     gui.newGameButton.setEnabled(true);
                     gui.roundsSpinner.setEnabled(true);
@@ -177,7 +176,7 @@ public class MainAgent extends Agent {
 
     public void stopGame() {
         gui.logLine("Stopping");
-        synchronized (semaphoreLock) {
+        synchronized (startstopSemaphore) {
             canProceed = false;
         }
         SwingUtilities.invokeLater(() -> {
@@ -191,9 +190,9 @@ public class MainAgent extends Agent {
 
     public void continueGame() {
         gui.logLine("Continuing");
-        synchronized (semaphoreLock) {
+        synchronized (startstopSemaphore) {
             canProceed = true;
-            semaphoreLock.notifyAll();
+            startstopSemaphore.notifyAll();
         }
         SwingUtilities.invokeLater(() -> {
             gui.runAllRoundsButton.setEnabled(false);
@@ -208,23 +207,6 @@ public class MainAgent extends Agent {
         SwingUtilities.invokeLater(() -> {
             if (gameManager != null) {
                 removeBehaviour(gameManager);
-            }
-            gui.runAllRoundsButton.setEnabled(true);
-            gui.runXRoundsButton.setEnabled(true);
-
-            remakeAgents(); // also deletes them from PLayerLists
-            updatePlayers(); // detects agents via jade
-            updatePlayers(); // dos veces por magia negra para actualizar la gui
-
-            addAllAgentsToPlayerList();
-            repopulateTable();
-
-            // Initialize (inform ID)
-            for (PlayerData player : playerDataList) {
-                ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-                msg.setContent("Id#" + player.id + "#" + parameters.N + "," + parameters.R + "," + parameters.S);
-                msg.addReceiver(player.aid);
-                send(msg);
             }
 
             gameManager = new GameManager();
@@ -345,14 +327,59 @@ public class MainAgent extends Agent {
 
         @Override
         public void action() {
-            // Organize the matches
-            for (int i = 0; i < playerDataList.size(); i++) {
-                for (int j = i + 1; j < playerDataList.size(); j++) {
-                    playGame(playerDataList.get(i), playerDataList.get(j));
-                }
+            gui.runAllRoundsButton.setEnabled(true);
+            gui.runXRoundsButton.setEnabled(true);
+            gui.leftPanelRoundsLabel.setText("Round 0 / " + parameters.R);
+
+            remakeAgents(); // also deletes them from PLayerLists
+            updatePlayers(); // detects agents via jade
+            updatePlayers(); // dos veces por magia negra para actualizar la gui
+
+            addAllAgentsToPlayerList();
+            repopulateTable();
+
+            // Initialize (inform ID)
+            for (PlayerData player : playerDataList) {
+                ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+                msg.setContent("Id#" + player.id + "#" + parameters.N + "," + parameters.R + "," + parameters.S);
+                msg.addReceiver(player.aid);
+                send(msg);
             }
 
-            gui.logLine("GameManager action");
+            // Hacer que se juegen rondas segun queramos. no todas a la vez
+            // Organize the matches
+            for (currentRound = 0; currentRound < parameters.R; currentRound++) {
+                synchronized (roundSemaphore) {
+                    while (currentRound >= maxExecRound) {
+                        try {
+                            roundSemaphore.wait();
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            e.printStackTrace();
+                        }
+                    }
+                    gui.leftPanelRoundsLabel.setText("Round " + currentRound + " / " + parameters.R);
+                }
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    e.printStackTrace();
+                    for (int i = 0; i < playerDataList.size(); i++) {
+                        for (int j = i + 1; j < playerDataList.size(); j++) {
+                            playGame(playerDataList.get(i), playerDataList.get(j));
+                        }
+                    }
+                }
+                /*
+                 * for (int i = 0; i < playerDataList.size(); i++) {
+                 * for (int j = i + 1; j < playerDataList.size(); j++) {
+                 * playGame(playerDataList.get(i), playerDataList.get(j));
+                 * }
+                 * }
+                 */
+            }
+            gui.logLine("All rounds finished");
         }
 
         private void playGame(PlayerData player1, PlayerData player2) {
