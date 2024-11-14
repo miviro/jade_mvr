@@ -58,7 +58,7 @@ public class RandomAgent extends Agent {
         Random random = new Random(1000);
         @Override
         public void action() {
-            System.out.println(getAID().getName() + ":" + state.name());
+            //System.out.println(getAID().getName() + ":" + state.name());
             msg = blockingReceive();
             if (msg != null) {
                 System.out.println(getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName()); //DELETEME

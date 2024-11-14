@@ -234,7 +234,6 @@ public class MainAgent extends Agent {
     }
 
     private void remakeAgents() {
-        // TODO: simplemente limpiamos la lista en vez de matarlos, no encuentro manera de matarlos limpiamente
         for (PlayerData player : playerDataList) {
             try {
                 AgentController agentController = getContainerController().getAgent(player.aid.getLocalName());
@@ -248,8 +247,11 @@ public class MainAgent extends Agent {
 
         for (int i = 0; i < parameters.N; i++) {
             try {
-                // UUID para evitar name clashes ya que la parte de arriba no mata los agentes apropiadamente
-                getContainerController().createNewAgent("randomAgent#" + UUID.randomUUID().toString(), "src.jade_mvr.RandomAgent", null).start();
+                // UUID para evitar name clashes ya que la parte de arriba no mata los agentes
+                // apropiadamente
+                getContainerController()
+                        .createNewAgent("randomAgent" + i, "src.jade_mvr.RandomAgent", null)
+                        .start();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -343,78 +345,58 @@ public class MainAgent extends Agent {
 
         @Override
         public void action() {
-            /*
-             * // Assign the IDs
-             * // TODO: mover a newGame()
-             * ArrayList<PlayerInformation> players = new ArrayList<>();
-             * int lastId = 0;
-             * for (AID a : playerAgents) {
-             * players.add(new PlayerInformation(a, lastId++));
-             * }
-             * 
-             * // Initialize (inform ID)
-             * for (PlayerInformation player : players) {
-             * ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-             * msg.setContent("Id#" + player.id + "#" + parameters.N + "," + parameters.R +
-             * "," + parameters.S);
-             * msg.addReceiver(player.aid);
-             * send(msg);
-             * }
-             * // Organize the matches
-             * for (int i = 0; i < players.size(); i++) {
-             * for (int j = i + 1; j < players.size(); j++) { // too lazy to think, let's
-             * see if it works or it breaks
-             * playGame(players.get(i), players.get(j));
-             * }
-             * }
-             */
+            // Organize the matches
+            for (int i = 0; i < playerDataList.size(); i++) {
+                for (int j = i + 1; j < playerDataList.size(); j++) {
+                    playGame(playerDataList.get(i), playerDataList.get(j));
+                }
+            }
+
             gui.logLine("GameManager action");
         }
 
         private void playGame(PlayerData player1, PlayerData player2) {
-            /*
-             * // Assuming player1.id < player2.id
-             * ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-             * msg.addReceiver(player1.aid);
-             * msg.addReceiver(player2.aid);
-             * msg.setContent("NewGame#" + player1.id + "," + player2.id);
-             * send(msg);
-             * 
-             * int pos1, pos2;
-             * 
-             * msg = new ACLMessage(ACLMessage.REQUEST);
-             * msg.setContent("Position");
-             * msg.addReceiver(player1.aid);
-             * send(msg);
-             * 
-             * gui.logLine("Main Waiting for movement");
-             * MessageTemplate mt =
-             * MessageTemplate.not(MessageTemplate.MatchPerformative(ACLMessage.
-             * ACCEPT_PROPOSAL));
-             * ACLMessage move1 = blockingReceive(mt);
-             * gui.logLine("Main Received " + move1.getContent() + " from " +
-             * move1.getSender().getName());
-             * pos1 = Integer.parseInt(move1.getContent().split("#")[1]);
-             * 
-             * msg = new ACLMessage(ACLMessage.REQUEST);
-             * msg.setContent("Position");
-             * msg.addReceiver(player2.aid);
-             * send(msg);
-             * 
-             * gui.logLine("Main Waiting for movement");
-             * ACLMessage move2 = blockingReceive();
-             * gui.logLine("Main Received " + move1.getContent() + " from " +
-             * move1.getSender().getName());
-             * pos2 = Integer.parseInt(move1.getContent().split("#")[1]);
-             * 
-             * msg = new ACLMessage(ACLMessage.INFORM);
-             * msg.addReceiver(player1.aid);
-             * msg.addReceiver(player2.aid);
-             * msg.setContent("Results#1#1");
-             * send(msg);
-             * msg.setContent("EndGame");
-             * send(msg);
-             */
+
+            // Assuming player1.id < player2.id
+            ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+            msg.addReceiver(player1.aid);
+            msg.addReceiver(player2.aid);
+            msg.setContent("NewGame#" + player1.id + "," + player2.id);
+            send(msg);
+
+            int pos1, pos2;
+
+            msg = new ACLMessage(ACLMessage.REQUEST);
+            msg.setContent("Position");
+            msg.addReceiver(player1.aid);
+            send(msg);
+
+            gui.logLine("Main Waiting for movement");
+            MessageTemplate mt = MessageTemplate.not(MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL));
+            ACLMessage move1 = blockingReceive(mt);
+            gui.logLine("Main Received " + move1.getContent() + " from " +
+                    move1.getSender().getName());
+            pos1 = Integer.parseInt(move1.getContent().split("#")[1]);
+
+            msg = new ACLMessage(ACLMessage.REQUEST);
+            msg.setContent("Position");
+            msg.addReceiver(player2.aid);
+            send(msg);
+
+            gui.logLine("Main Waiting for movement");
+            ACLMessage move2 = blockingReceive();
+            gui.logLine("Main Received " + move1.getContent() + " from " +
+                    move1.getSender().getName());
+            pos2 = Integer.parseInt(move1.getContent().split("#")[1]);
+
+            msg = new ACLMessage(ACLMessage.INFORM);
+            msg.addReceiver(player1.aid);
+            msg.addReceiver(player2.aid);
+            msg.setContent("Results#1#1");
+            send(msg);
+            msg.setContent("EndGame");
+            send(msg);
+
         }
 
         @Override
