@@ -30,8 +30,7 @@ import com.formdev.flatlaf.FlatLightLaf;
 public class MainAgent extends Agent {
     private List<PlayerData> playerDataList = new ArrayList<>();
     private GameManager gameManager;
-    private int maxExecRound = 0;
-    private int currentRound = 0;
+    Rounderer rounderer;
 
     private Object[][] getPlayerDataArray() {
         Object[][] dataArray = new Object[playerDataList.size()][gui.columns.length];
@@ -127,7 +126,6 @@ public class MainAgent extends Agent {
 
     // Semaphore fields
     private final Object startstopSemaphore = new Object();
-    private final Object roundSemaphore = new Object();
     private volatile boolean canProceed = true;
 
     public void runXRounds(int rounds) {
@@ -149,18 +147,22 @@ public class MainAgent extends Agent {
                 // Check the semaphore before proceeding
                 synchronized (startstopSemaphore) {
                     while (!canProceed) {
-                        startstopSemaphore.wait();
+                        try {
+                            startstopSemaphore.wait();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                            System.exit(1);
+                        }
                     }
                 }
-                maxExecRound = currentRound + rounds;
-                synchronized (roundSemaphore) {
-                    roundSemaphore.notifyAll();
-                }
+                rounderer.runXRounds(rounds);
+
                 return null;
             }
 
             @Override
             protected void done() {
+
                 SwingUtilities.invokeLater(() -> {
                     gui.newGameButton.setEnabled(true);
                     gui.roundsSpinner.setEnabled(true);
@@ -175,11 +177,15 @@ public class MainAgent extends Agent {
     }
 
     public void stopGame() {
-        gui.logLine("Stopping");
+        gui.logLine("Stopping game...");
         synchronized (startstopSemaphore) {
             canProceed = false;
+            startstopSemaphore.notifyAll();  // Notify waiting threads
         }
+        
+        // Update UI after state change
         SwingUtilities.invokeLater(() -> {
+            gui.newGameButton.setEnabled(true);
             gui.runAllRoundsButton.setEnabled(true);
             gui.roundsSpinner.setEnabled(true);
             gui.runXRoundsButton.setEnabled(true);
@@ -195,6 +201,7 @@ public class MainAgent extends Agent {
             startstopSemaphore.notifyAll();
         }
         SwingUtilities.invokeLater(() -> {
+            gui.newGameButton.setEnabled(false);
             gui.runAllRoundsButton.setEnabled(false);
             gui.roundsSpinner.setEnabled(false);
             gui.runXRoundsButton.setEnabled(false);
@@ -347,43 +354,79 @@ public class MainAgent extends Agent {
             }
 
             // Hacer que se juegen rondas segun queramos. no todas a la vez
-            // Organize the matches
-            for (currentRound = 0; currentRound < parameters.R; currentRound++) {
-                synchronized (roundSemaphore) {
-                    while (currentRound >= maxExecRound) {
-                        try {
-                            roundSemaphore.wait();
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            e.printStackTrace();
-                        }
-                    }
-                    gui.leftPanelRoundsLabel.setText("Round " + currentRound + " / " + parameters.R);
-                }
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    e.printStackTrace();
-                    for (int i = 0; i < playerDataList.size(); i++) {
-                        for (int j = i + 1; j < playerDataList.size(); j++) {
-                            playGame(playerDataList.get(i), playerDataList.get(j));
-                        }
-                    }
-                }
-                /*
-                 * for (int i = 0; i < playerDataList.size(); i++) {
-                 * for (int j = i + 1; j < playerDataList.size(); j++) {
-                 * playGame(playerDataList.get(i), playerDataList.get(j));
-                 * }
-                 * }
-                 */
+            rounderer = new Rounderer();
+        }
+
+        @Override
+        public boolean done() {
+            return true;
+        }
+    }
+
+    public class GameParametersStruct {
+        int N, R, S, I;
+
+        public GameParametersStruct() { // TODO: set default R=500, I=1
+            N = 2;
+            R = 50;
+            S = 4;
+            I = 0;
+        }
+
+        @Override
+        public String toString() {
+            return "N=" + N + ", S=" + S + ", R=" + R + ", I=" + I;
+        }
+    }
+
+    private class Rounderer {
+        private int currentRound = 0;
+
+        public void runXRounds(int rounds) {
+            // TODO reiniciar estado de stop y continue?
+            int remainingRounds = parameters.R - currentRound;
+            int roundsToRun = Math.min(rounds, remainingRounds);
+
+            if (roundsToRun <= 0) {
+                gui.logLine("Maximum rounds reached");
+                return;
             }
-            gui.logLine("All rounds finished");
+
+            for (int i = 0; i < roundsToRun; i++) {
+                synchronized (startstopSemaphore) {
+                    while (!canProceed) {
+                        try {
+                            gui.logLine("stopper by stop");
+                            startstopSemaphore.wait();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                            return;
+                        }
+                    }
+                }
+
+                currentRound++;
+                runRound();
+            }
+        }
+
+        private void runRound() {
+                gui.leftPanelRoundsLabel.setText("Round " + currentRound + " / " + parameters.R);
+            // TODO: Run all games
+            /*
+             * for (int i = 0; i < playerDataList.size(); i++) {
+             * for (int j = i + 1; j < playerDataList.size(); j++) {
+             * playGame(playerDataList.get(i), playerDataList.get(j));
+             * }
+             * }
+             */
+            try {
+                Thread.sleep(2000);
+            } catch (Exception e) {
+            }
         }
 
         private void playGame(PlayerData player1, PlayerData player2) {
-
             // Assuming player1.id < player2.id
             ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
             msg.addReceiver(player1.aid);
@@ -424,34 +467,6 @@ public class MainAgent extends Agent {
             msg.setContent("EndGame");
             send(msg);
 
-        }
-
-        @Override
-        public boolean done() {
-            return true;
-        }
-    }
-
-    public class GameParametersStruct {
-
-        int N;
-        int R;
-        int S;
-        int I;
-
-        public GameParametersStruct() { // TODO: set default R=500, I=1
-            N = 2;
-            R = 50;
-            S = 4;
-            I = 0;
-        }
-
-        @Override
-        public String toString() {
-            return "N=" + N +
-                    ", S=" + S +
-                    ", R=" + R +
-                    ", I=" + I;
         }
     }
 }
