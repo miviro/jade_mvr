@@ -9,6 +9,7 @@ import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
+import jade.wrapper.AgentController;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -17,6 +18,7 @@ import java.awt.Font;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
@@ -29,12 +31,13 @@ import com.formdev.flatlaf.FlatLightLaf;
 
 public class MainAgent extends Agent {
     private List<PlayerData> playerDataList = new ArrayList<>();
+    private GameManager gameManager;
 
     private Object[][] getPlayerDataArray() {
         Object[][] dataArray = new Object[playerDataList.size()][gui.columns.length];
         for (int i = 0; i < playerDataList.size(); i++) {
             PlayerData playerData = playerDataList.get(i);
-            dataArray[i][0] = playerData.player;
+            dataArray[i][0] = playerData.id;
             dataArray[i][1] = playerData.score;
             dataArray[i][2] = playerData.wins;
             dataArray[i][3] = playerData.losses;
@@ -43,13 +46,13 @@ public class MainAgent extends Agent {
             dataArray[i][6] = "0"; // para rellenar la columna de rank, que se calculara on runtime
             dataArray[i][7] = playerData.status;
             dataArray[i][8] = playerData.actions;
-            dataArray[i][9] = playerData.address;
+            dataArray[i][9] = playerData.aid;
         }
         return dataArray;
     }
 
     private class PlayerData {
-        String player;
+        int id;
         int score;
         int wins;
         int losses;
@@ -57,10 +60,11 @@ public class MainAgent extends Agent {
         int points;
         PlayerStatus status;
         String actions;
-        String address;
+        AID aid;
 
-        public PlayerData(String player, int score, int wins, int losses, int draws, int points, PlayerStatus status, String actions, String address) {
-            this.player = player;
+        public PlayerData(int id, int score, int wins, int losses, int draws, int points, PlayerStatus status,
+                String actions, AID aid) {
+            this.id = id;
             this.score = score;
             this.wins = wins;
             this.losses = losses;
@@ -68,15 +72,20 @@ public class MainAgent extends Agent {
             this.points = points;
             this.status = status;
             this.actions = actions;
-            this.address = address;
+            this.aid = aid;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return aid.equals(o);
         }
     }
+
     enum PlayerStatus {
         ACTIVE, INACTIVE
     }
 
     private GUI gui;
-    private AID[] playerAgents;
     private GameParametersStruct parameters = new GameParametersStruct();
 
     public GameParametersStruct getParameters() {
@@ -197,62 +206,64 @@ public class MainAgent extends Agent {
 
     public int newGame() {
         SwingUtilities.invokeLater(() -> {
-            remakeAgents();
-            updatePlayers();
-
-            repopulateTable();
-
+            if (gameManager != null) {
+                removeBehaviour(gameManager);
+            }
             gui.runAllRoundsButton.setEnabled(true);
             gui.runXRoundsButton.setEnabled(true);
 
-            addBehaviour(new GameManager());
+            remakeAgents(); // also deletes them from PLayerLists
+            updatePlayers(); // detects agents via jade
+            updatePlayers(); // dos veces por magia negra para actualizar la gui
+
+            addAllAgentsToPlayerList();
+            repopulateTable();
+
+            // Initialize (inform ID)
+            for (PlayerData player : playerDataList) {
+                ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+                msg.setContent("Id#" + player.id + "#" + parameters.N + "," + parameters.R + "," + parameters.S);
+                msg.addReceiver(player.aid);
+                send(msg);
+            }
+
+            gameManager = new GameManager();
+            addBehaviour(gameManager);
         });
         return 0;
     }
 
     private void remakeAgents() {
-        // Mandar mensaje a todos los jugadores actuales para que dejen de existir
-        ACLMessage endMessage = new ACLMessage(ACLMessage.REQUEST);
-        endMessage.setContent("KYS#");
-        for (AID agent : playerAgents) {
-            endMessage.addReceiver(agent);    
-        }
-        send(endMessage);
-        int confirmations = 0;
-        MessageTemplate mt = MessageTemplate.and(
-            MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL),
-            MessageTemplate.MatchContent("KMS#.*")
-        );
-        // Esperar a recibir todas las confirmaciones
-        while (confirmations < playerAgents.length) {
-            ACLMessage msg = blockingReceive(mt);
-            if (msg != null) {
-                confirmations++;
-                gui.logLine("Received confirmation from " + msg.getSender().getName());
+        // TODO: simplemente limpiamos la lista en vez de matarlos, no encuentro manera de matarlos limpiamente
+        for (PlayerData player : playerDataList) {
+            try {
+                AgentController agentController = getContainerController().getAgent(player.aid.getLocalName());
+                agentController.kill();
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
 
         playerDataList.clear();
 
-        for(int i = 0; i < parameters.N; i++) {
+        for (int i = 0; i < parameters.N; i++) {
             try {
-                getContainerController().createNewAgent("randomAgent" + i, "src.jade_mvr.RandomAgent", null).start();
+                // UUID para evitar name clashes ya que la parte de arriba no mata los agentes apropiadamente
+                getContainerController().createNewAgent("randomAgent#" + UUID.randomUUID().toString(), "src.jade_mvr.RandomAgent", null).start();
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
     }
 
+    private void addAllAgentsToPlayerList() {
+        for (int i = 0; i < parameters.N; i++) {
+        }
+    }
+
     private void repopulateTable() {
         gui.centerPanel.removeAll();
 
-        for (int i = 0; i < parameters.N; i++) {
-        PlayerData playerData = new PlayerData("Player " + i, 0, 0, 0, 0, 0, PlayerStatus.ACTIVE, "", "");
-            playerDataList.add(playerData);
-        }
-
-
-        
         // Create a new JTable with the data
         JTable table = new JTable(getPlayerDataArray(), gui.columns) {
             // Make cells non-editable
@@ -298,6 +309,7 @@ public class MainAgent extends Agent {
     }
 
     public int updatePlayers() {
+        playerDataList.clear();
         gui.logLine("Updating player list");
         DFAgentDescription template = new DFAgentDescription();
         ServiceDescription sd = new ServiceDescription();
@@ -308,18 +320,17 @@ public class MainAgent extends Agent {
             if (result.length > 0) {
                 gui.logLine("Found " + result.length + " players");
             }
-            playerAgents = new AID[result.length];
             for (int i = 0; i < result.length; ++i) {
-                playerAgents[i] = result[i].getName();
+                PlayerData playerData = new PlayerData(i, 0, 0, 0, 0, 0, PlayerStatus.ACTIVE, "", result[i].getName());
+                playerDataList.add(playerData);
             }
         } catch (FIPAException fe) {
             gui.logLine(fe.getMessage());
         }
-        // Provisional
-        String[] playerNames = new String[playerAgents.length];
-        for (int i = 0; i < playerAgents.length; i++) {
-            playerNames[i] = playerAgents[i].getName();
-        }
+
+        String[] playerNames = playerDataList.stream()
+                .map(player -> player.aid.getName())
+                .toArray(String[]::new);
         gui.setPlayersUI(playerNames);
         return 0;
     }
@@ -332,88 +343,83 @@ public class MainAgent extends Agent {
 
         @Override
         public void action() {
-            // Assign the IDs
-            // TODO: mover a newGame()
-            ArrayList<PlayerInformation> players = new ArrayList<>();
-            int lastId = 0;
-            for (AID a : playerAgents) {
-                players.add(new PlayerInformation(a, lastId++));
-            }
-
-            // Initialize (inform ID)
-            for (PlayerInformation player : players) {
-                ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-                msg.setContent("Id#" + player.id + "#" + parameters.N + "," + parameters.R + "," + parameters.S);
-                msg.addReceiver(player.aid);
-                send(msg);
-            }
-            // Organize the matches
-            for (int i = 0; i < players.size(); i++) {
-                for (int j = i + 1; j < players.size(); j++) { // too lazy to think, let's see if it works or it breaks
-                    playGame(players.get(i), players.get(j));
-                }
-            }
+            /*
+             * // Assign the IDs
+             * // TODO: mover a newGame()
+             * ArrayList<PlayerInformation> players = new ArrayList<>();
+             * int lastId = 0;
+             * for (AID a : playerAgents) {
+             * players.add(new PlayerInformation(a, lastId++));
+             * }
+             * 
+             * // Initialize (inform ID)
+             * for (PlayerInformation player : players) {
+             * ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+             * msg.setContent("Id#" + player.id + "#" + parameters.N + "," + parameters.R +
+             * "," + parameters.S);
+             * msg.addReceiver(player.aid);
+             * send(msg);
+             * }
+             * // Organize the matches
+             * for (int i = 0; i < players.size(); i++) {
+             * for (int j = i + 1; j < players.size(); j++) { // too lazy to think, let's
+             * see if it works or it breaks
+             * playGame(players.get(i), players.get(j));
+             * }
+             * }
+             */
+            gui.logLine("GameManager action");
         }
 
-        private void playGame(PlayerInformation player1, PlayerInformation player2) {
-            // Assuming player1.id < player2.id
-            ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-            msg.addReceiver(player1.aid);
-            msg.addReceiver(player2.aid);
-            msg.setContent("NewGame#" + player1.id + "," + player2.id);
-            send(msg);
-
-            int pos1, pos2;
-
-            msg = new ACLMessage(ACLMessage.REQUEST);
-            msg.setContent("Position");
-            msg.addReceiver(player1.aid);
-            send(msg);
-
-            gui.logLine("Main Waiting for movement");
-            MessageTemplate mt = MessageTemplate.not(MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL));
-            ACLMessage move1 = blockingReceive(mt);
-            gui.logLine("Main Received " + move1.getContent() + " from " + move1.getSender().getName());
-            pos1 = Integer.parseInt(move1.getContent().split("#")[1]);
-
-            msg = new ACLMessage(ACLMessage.REQUEST);
-            msg.setContent("Position");
-            msg.addReceiver(player2.aid);
-            send(msg);
-
-            gui.logLine("Main Waiting for movement");
-            ACLMessage move2 = blockingReceive();
-            gui.logLine("Main Received " + move1.getContent() + " from " + move1.getSender().getName());
-            pos2 = Integer.parseInt(move1.getContent().split("#")[1]);
-
-            msg = new ACLMessage(ACLMessage.INFORM);
-            msg.addReceiver(player1.aid);
-            msg.addReceiver(player2.aid);
-            msg.setContent("Results#1#1");
-            send(msg);
-            msg.setContent("EndGame");
-            send(msg);
+        private void playGame(PlayerData player1, PlayerData player2) {
+            /*
+             * // Assuming player1.id < player2.id
+             * ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+             * msg.addReceiver(player1.aid);
+             * msg.addReceiver(player2.aid);
+             * msg.setContent("NewGame#" + player1.id + "," + player2.id);
+             * send(msg);
+             * 
+             * int pos1, pos2;
+             * 
+             * msg = new ACLMessage(ACLMessage.REQUEST);
+             * msg.setContent("Position");
+             * msg.addReceiver(player1.aid);
+             * send(msg);
+             * 
+             * gui.logLine("Main Waiting for movement");
+             * MessageTemplate mt =
+             * MessageTemplate.not(MessageTemplate.MatchPerformative(ACLMessage.
+             * ACCEPT_PROPOSAL));
+             * ACLMessage move1 = blockingReceive(mt);
+             * gui.logLine("Main Received " + move1.getContent() + " from " +
+             * move1.getSender().getName());
+             * pos1 = Integer.parseInt(move1.getContent().split("#")[1]);
+             * 
+             * msg = new ACLMessage(ACLMessage.REQUEST);
+             * msg.setContent("Position");
+             * msg.addReceiver(player2.aid);
+             * send(msg);
+             * 
+             * gui.logLine("Main Waiting for movement");
+             * ACLMessage move2 = blockingReceive();
+             * gui.logLine("Main Received " + move1.getContent() + " from " +
+             * move1.getSender().getName());
+             * pos2 = Integer.parseInt(move1.getContent().split("#")[1]);
+             * 
+             * msg = new ACLMessage(ACLMessage.INFORM);
+             * msg.addReceiver(player1.aid);
+             * msg.addReceiver(player2.aid);
+             * msg.setContent("Results#1#1");
+             * send(msg);
+             * msg.setContent("EndGame");
+             * send(msg);
+             */
         }
 
         @Override
         public boolean done() {
             return true;
-        }
-    }
-
-    public class PlayerInformation {
-
-        AID aid;
-        int id;
-
-        public PlayerInformation(AID a, int i) {
-            aid = a;
-            id = i;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            return aid.equals(o);
         }
     }
 

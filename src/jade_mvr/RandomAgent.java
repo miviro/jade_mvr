@@ -47,7 +47,7 @@ public class RandomAgent extends Agent {
         }
 
         System.out.println("RandomPlayer " + getAID().getName() + " terminating.");
-        System.exit(0);
+        // TODO: NUNCA PONER SYSTEM.EXIT(0) AQUI!!!!!!!!!!!!!!!!!!!
     }
 
     private enum State {
@@ -62,14 +62,6 @@ public class RandomAgent extends Agent {
             msg = blockingReceive();
             if (msg != null) {
                 System.out.println(getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName()); //DELETEME
-
-                if (msg.getContent().startsWith("KYS#")) {
-                    ACLMessage reply = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
-                    reply.addReceiver(msg.getSender());
-                    reply.setContent("KMS#Terminating agent " + getAID().getName());
-                    send(reply);
-                    takeDown();
-                }
 
                 switch (state) {
                     case s0NoConfig:
