@@ -27,9 +27,11 @@ public final class GUI extends JFrame implements ActionListener {
     private LoggingOutputStream loggingOutputStream;
 
     // Define a consistent color scheme
-    private final Color primaryColor = new Color(0x2C3E50); // Dark Blue
-    private final Color secondaryColor = new Color(0xECF0F1); // Light Grey
-    private final Color accentColor = new Color(0x3498DB); // Bright Blue
+    public final Color primaryColor = new Color(0x2C3E50); // Dark Blue
+    public final Color secondaryColor = new Color(0xECF0F1); // Light Grey
+    public final Color accentColor = new Color(0x3498DB); // Bright Blue
+    public final String[] columns = {"Player", "Score", "Wins", "Losses", "Draws", "Points", "Rank", "Status", "Actions", "Address"};
+
 
     JButton  stopButton = createToolbarButton("Stop", "stop_icon.png");
     JButton continueButton = createToolbarButton("Continue", "continue_icon.png");
@@ -37,7 +39,7 @@ public final class GUI extends JFrame implements ActionListener {
     JSpinner roundsSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 100, 1));
     JButton runXRoundsButton = createToolbarButton("Run X Rounds", "run_x_rounds_icon.png");
     JButton newGameButton = createToolbarButton("New Game", "new_game_icon.png");
-
+    JPanel centerPanel;
 
     public GUI() {
         initUI();
@@ -116,7 +118,7 @@ public final class GUI extends JFrame implements ActionListener {
 
         // Split Pane for main content
         JSplitPane mainSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, createLeftPanel(),
-                createCenterPanel(null));
+                createCenterPanel());
         mainSplitPane.setResizeWeight(0.2);
         mainSplitPane.setOneTouchExpandable(true);
         pane.add(mainSplitPane, BorderLayout.CENTER);
@@ -282,57 +284,13 @@ public final class GUI extends JFrame implements ActionListener {
         return leftPanel;
     }
 
-    private JPanel createCenterPanel(Object[][] data) {
-        String[] columns = { "Players", "Score", "Wins", "Losses", "Draws", "Points", "Rank", "Status", "Last",
-                "Remarks" };
-
-        JPanel centerPanel = new JPanel(new BorderLayout(columns.length, columns.length));
+    private JPanel createCenterPanel() {
+        centerPanel = new JPanel(new BorderLayout());
         centerPanel.setBorder(new CompoundBorder(
                 new TitledBorder(new LineBorder(primaryColor, 2, true), "Player Results", TitledBorder.LEFT,
                         TitledBorder.TOP, new Font("Segoe UI", Font.BOLD, 16), primaryColor),
-                new EmptyBorder(columns.length, columns.length, columns.length, columns.length)));
+                new EmptyBorder(10, 10, 10, 10)));
         centerPanel.setBackground(secondaryColor);
-
-        // Player Results Table
-        if (data == null) {
-            data = new Object[0][columns.length];
-        }
-
-        JTable payoffTable = new JTable(data, columns) {
-            // Make cells non-editable
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false;
-            }
-
-            // Implement cell renderer for better aesthetics
-            @Override
-            public Component prepareRenderer(javax.swing.table.TableCellRenderer renderer, int row, int column) {
-                Component c = super.prepareRenderer(renderer, row, column);
-                if (isRowSelected(row)) {
-                    c.setBackground(accentColor);
-                    c.setForeground(Color.WHITE);
-                } else {
-                    c.setBackground(Color.WHITE);
-                    c.setForeground(Color.BLACK);
-                }
-                return c;
-            }
-        };
-        payoffTable.setFillsViewportHeight(true);
-        payoffTable.setFont(new Font("Segoe UI", Font.PLAIN, 14));
-        payoffTable.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
-        payoffTable.getTableHeader().setBackground(primaryColor);
-        payoffTable.getTableHeader().setForeground(Color.WHITE);
-        payoffTable.getTableHeader().setReorderingAllowed(false);
-        payoffTable.setRowHeight(30);
-        payoffTable.setSelectionBackground(accentColor);
-        payoffTable.setSelectionForeground(Color.WHITE);
-
-        JScrollPane tableScrollPane = new JScrollPane(payoffTable);
-        tableScrollPane.setBorder(new LineBorder(primaryColor, 1, true));
-
-        centerPanel.add(tableScrollPane, BorderLayout.CENTER);
 
         return centerPanel;
     }

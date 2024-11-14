@@ -9,16 +9,70 @@ import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
 
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Font;
 import java.io.PrintStream;
 import java.util.ArrayList;
+import java.util.List;
 
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.UIManager;
+import javax.swing.border.LineBorder;
 
 import com.formdev.flatlaf.FlatLightLaf;
 
 public class MainAgent extends Agent {
+    private List<PlayerData> playerDataList = new ArrayList<>();
+
+    private Object[][] getPlayerDataArray() {
+        Object[][] dataArray = new Object[playerDataList.size()][gui.columns.length];
+        for (int i = 0; i < playerDataList.size(); i++) {
+            PlayerData playerData = playerDataList.get(i);
+            dataArray[i][0] = playerData.player;
+            dataArray[i][1] = playerData.score;
+            dataArray[i][2] = playerData.wins;
+            dataArray[i][3] = playerData.losses;
+            dataArray[i][4] = playerData.draws;
+            dataArray[i][5] = playerData.points;
+            dataArray[i][6] = "0"; // para rellenar la columna de rank, que se calculara on runtime
+            dataArray[i][7] = playerData.status;
+            dataArray[i][8] = playerData.actions;
+            dataArray[i][9] = playerData.address;
+        }
+        return dataArray;
+    }
+
+    private class PlayerData {
+        String player;
+        int score;
+        int wins;
+        int losses;
+        int draws;
+        int points;
+        PlayerStatus status;
+        String actions;
+        String address;
+
+        public PlayerData(String player, int score, int wins, int losses, int draws, int points, PlayerStatus status, String actions, String address) {
+            this.player = player;
+            this.score = score;
+            this.wins = wins;
+            this.losses = losses;
+            this.draws = draws;
+            this.points = points;
+            this.status = status;
+            this.actions = actions;
+            this.address = address;
+        }
+    }
+    enum PlayerStatus {
+        ACTIVE, INACTIVE
+    }
 
     private GUI gui;
     private AID[] playerAgents;
@@ -69,6 +123,7 @@ public class MainAgent extends Agent {
         // Disable buttons and enable stopButton on EDT
         SwingUtilities.invokeLater(() -> {
             gui.newGameButton.setEnabled(false);
+            gui.roundsSpinner.setEnabled(false);
             gui.runAllRoundsButton.setEnabled(false);
             gui.runXRoundsButton.setEnabled(false);
             gui.stopButton.setEnabled(true);
@@ -80,14 +135,14 @@ public class MainAgent extends Agent {
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
             @Override
             protected Void doInBackground() throws Exception {
-                for (int i = 0; i < 4; i++) {
+                for (int i = 0; i < rounds; i++) {
                     // Check the semaphore before proceeding
                     synchronized (semaphoreLock) {
                         while (!canProceed) {
                             semaphoreLock.wait();
                         }
                     }
-                    gui.logLine("Running round " + (i + 1));   
+                    gui.logLine("Running round " + (i + 1));
                     // Perform the round
                     Thread.sleep(2000);
                 }
@@ -99,6 +154,7 @@ public class MainAgent extends Agent {
                 gui.logLine("All rounds finished");
                 SwingUtilities.invokeLater(() -> {
                     gui.newGameButton.setEnabled(true);
+                    gui.roundsSpinner.setEnabled(true);
                     gui.runAllRoundsButton.setEnabled(true);
                     gui.runXRoundsButton.setEnabled(true);
                     gui.stopButton.setEnabled(false);
@@ -116,6 +172,7 @@ public class MainAgent extends Agent {
         }
         SwingUtilities.invokeLater(() -> {
             gui.runAllRoundsButton.setEnabled(true);
+            gui.roundsSpinner.setEnabled(true);
             gui.runXRoundsButton.setEnabled(true);
             gui.continueButton.setEnabled(true);
             gui.stopButton.setEnabled(false);
@@ -130,10 +187,78 @@ public class MainAgent extends Agent {
         }
         SwingUtilities.invokeLater(() -> {
             gui.runAllRoundsButton.setEnabled(false);
+            gui.roundsSpinner.setEnabled(false);
             gui.runXRoundsButton.setEnabled(false);
             gui.continueButton.setEnabled(false);
             gui.stopButton.setEnabled(true);
         });
+    }
+
+    public int newGame() {
+        SwingUtilities.invokeLater(() -> {
+
+            repopulateTable();
+
+            gui.runAllRoundsButton.setEnabled(true);
+            gui.runXRoundsButton.setEnabled(true);
+
+            addBehaviour(new GameManager());
+        });
+        return 0;
+    }
+
+    private void repopulateTable() {
+        gui.centerPanel.removeAll();
+
+        for (int i = 0; i < parameters.N; i++) {
+        PlayerData playerData = new PlayerData("Player " + i, 0, 0, 0, 0, 0, PlayerStatus.ACTIVE, "", "");
+            playerDataList.add(playerData);
+        }
+
+
+        
+        // Create a new JTable with the data
+        JTable table = new JTable(getPlayerDataArray(), gui.columns) {
+            // Make cells non-editable
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+
+            // Implement cell renderer for better aesthetics
+            @Override
+            public Component prepareRenderer(javax.swing.table.TableCellRenderer renderer, int row, int column) {
+                Component c = super.prepareRenderer(renderer, row, column);
+                if (isRowSelected(row)) {
+                    c.setBackground(gui.accentColor);
+                    c.setForeground(Color.WHITE);
+                } else {
+                    c.setBackground(Color.WHITE);
+                    c.setForeground(Color.BLACK);
+                }
+                return c;
+            }
+        };
+
+        table.setFillsViewportHeight(true);
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
+        table.getTableHeader().setBackground(gui.primaryColor);
+        table.getTableHeader().setForeground(Color.WHITE);
+        table.getTableHeader().setReorderingAllowed(false);
+        table.setRowHeight(30);
+        table.setSelectionBackground(gui.accentColor);
+        table.setSelectionForeground(Color.WHITE);
+
+        // Add the table to a scroll pane
+        JScrollPane scrollPane = new JScrollPane(table);
+        scrollPane.setBorder(new LineBorder(gui.primaryColor, 1, true));
+
+        // Add the scroll pane to the center panel
+        gui.centerPanel.add(scrollPane, BorderLayout.CENTER);
+        // Revalidate and repaint the center panel to reflect changes
+        gui.centerPanel.revalidate();
+        gui.centerPanel.repaint();
     }
 
     public int updatePlayers() {
@@ -160,16 +285,6 @@ public class MainAgent extends Agent {
             playerNames[i] = playerAgents[i].getName();
         }
         gui.setPlayersUI(playerNames);
-        return 0;
-    }
-
-    public int newGame() {
-        SwingUtilities.invokeLater(() -> {
-            gui.runAllRoundsButton.setEnabled(true);
-            gui.runXRoundsButton.setEnabled(true);
-        });
-
-        addBehaviour(new GameManager());
         return 0;
     }
 
