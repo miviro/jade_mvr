@@ -8,6 +8,7 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
+import jade.lang.acl.MessageTemplate;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -196,6 +197,8 @@ public class MainAgent extends Agent {
 
     public int newGame() {
         SwingUtilities.invokeLater(() -> {
+            remakeAgents();
+            updatePlayers();
 
             repopulateTable();
 
@@ -205,6 +208,39 @@ public class MainAgent extends Agent {
             addBehaviour(new GameManager());
         });
         return 0;
+    }
+
+    private void remakeAgents() {
+        // Mandar mensaje a todos los jugadores actuales para que dejen de existir
+        ACLMessage endMessage = new ACLMessage(ACLMessage.REQUEST);
+        endMessage.setContent("KYS#");
+        for (AID agent : playerAgents) {
+            endMessage.addReceiver(agent);    
+        }
+        send(endMessage);
+        int confirmations = 0;
+        MessageTemplate mt = MessageTemplate.and(
+            MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL),
+            MessageTemplate.MatchContent("KMS#.*")
+        );
+        // Esperar a recibir todas las confirmaciones
+        while (confirmations < playerAgents.length) {
+            ACLMessage msg = blockingReceive(mt);
+            if (msg != null) {
+                confirmations++;
+                gui.logLine("Received confirmation from " + msg.getSender().getName());
+            }
+        }
+
+        playerDataList.clear();
+
+        for(int i = 0; i < parameters.N; i++) {
+            try {
+                getContainerController().createNewAgent("randomAgent" + i, "src.jade_mvr.RandomAgent", null).start();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     private void repopulateTable() {
@@ -297,6 +333,7 @@ public class MainAgent extends Agent {
         @Override
         public void action() {
             // Assign the IDs
+            // TODO: mover a newGame()
             ArrayList<PlayerInformation> players = new ArrayList<>();
             int lastId = 0;
             for (AID a : playerAgents) {
@@ -334,7 +371,8 @@ public class MainAgent extends Agent {
             send(msg);
 
             gui.logLine("Main Waiting for movement");
-            ACLMessage move1 = blockingReceive();
+            MessageTemplate mt = MessageTemplate.not(MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL));
+            ACLMessage move1 = blockingReceive(mt);
             gui.logLine("Main Received " + move1.getContent() + " from " + move1.getSender().getName());
             pos1 = Integer.parseInt(move1.getContent().split("#")[1]);
 
@@ -386,7 +424,7 @@ public class MainAgent extends Agent {
         int S;
         int I;
 
-        public GameParametersStruct() {
+        public GameParametersStruct() { // TODO: set default R=500, I=1
             N = 2;
             R = 50;
             S = 4;

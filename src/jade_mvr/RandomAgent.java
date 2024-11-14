@@ -45,7 +45,9 @@ public class RandomAgent extends Agent {
         } catch (FIPAException e) {
             e.printStackTrace();
         }
+
         System.out.println("RandomPlayer " + getAID().getName() + " terminating.");
+        System.exit(0);
     }
 
     private enum State {
@@ -60,7 +62,15 @@ public class RandomAgent extends Agent {
             msg = blockingReceive();
             if (msg != null) {
                 System.out.println(getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName()); //DELETEME
-                //-------- Agent logic
+
+                if (msg.getContent().startsWith("KYS#")) {
+                    ACLMessage reply = new ACLMessage(ACLMessage.ACCEPT_PROPOSAL);
+                    reply.addReceiver(msg.getSender());
+                    reply.setContent("KMS#Terminating agent " + getAID().getName());
+                    send(reply);
+                    takeDown();
+                }
+
                 switch (state) {
                     case s0NoConfig:
                         //If INFORM Id#_#_,_,_,_ PROCESS SETUP --> go to state 1
@@ -137,12 +147,6 @@ public class RandomAgent extends Agent {
             }
         }
 
-        /**
-         * Validates and extracts the parameters from the setup message
-         *
-         * @param msg ACLMessage to process
-         * @return true on success, false on failure
-         */
         private boolean validateSetupMessage(ACLMessage msg) throws NumberFormatException {
             int tN, tS, tR, tMyId;
             String msgContent = msg.getContent();

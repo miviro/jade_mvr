@@ -11,7 +11,7 @@
                 "-notmp",
                 "-gui",
                 "-agents",
-                "MainAgent:src.jade_mvr.MainAgent;RandomAgent:src.jade_mvr.RandomAgent;"
+                "MainAgent:src.jade_mvr.MainAgent; "
             ],
             "preLaunchTask": "javac",
             "classPaths": [
