@@ -4,6 +4,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "MainAgent",
+            "request": "launch",
+            "mainClass": "src.jade_mvr.MainAgent",
+            "projectName": "jade_mvr_a8f32e5"
+        },
+        {
+            "type": "java",
             "name": "GUI",
             "request": "launch",
             "mainClass": "src.jade_mvr.GUI",
