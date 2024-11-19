@@ -1,4 +1,4 @@
-package src.jade_mvr;
+package src.agents;
 import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.CyclicBehaviour;
