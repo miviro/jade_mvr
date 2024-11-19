@@ -1,6 +1,7 @@
 package src.jade_mvr;
 
 import javax.swing.*;
+import javax.swing.event.ChangeListener;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.text.NumberFormatter;
@@ -10,8 +11,10 @@ import src.jade_mvr.MainAgent.GameParametersStruct;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
 
 public class GUI extends JFrame {
     private JMenuBar menuBar;
@@ -31,6 +34,7 @@ public class GUI extends JFrame {
     private JSpinner playXRoundsSpinner;
     private JLabel playXRoundsLabel;
     private JTextArea logTextArea;
+    private JCheckBox verboseCheckBox;
 
     public GUI() {
         setTitle("JADE MVR");
@@ -96,10 +100,8 @@ public class GUI extends JFrame {
         JPanel knownAgentsPanel = new JPanel();
         knownAgentsPanel.setBorder(BorderFactory.createTitledBorder("Known Agents"));
         knownAgentsPanel.setLayout(new BoxLayout(knownAgentsPanel, BoxLayout.Y_AXIS));
-       // knownAgentsPanel.setPreferredSize(new Dimension(440, 370));
-
-        // Example agents
-        String[] agentNames = {"Agent A", "Agent B", "Agent C", "Agent D","Agent X","Agent D","Agent D","Agent D","Agent D", "Agent E"};
+        // Get agents from MainAgent
+        ArrayList<String> agentNames = MainAgent.getAgentsList();
         for (String name : agentNames) {
             JPanel agentPanel = new JPanel(new BorderLayout());
             agentPanel.add(new JLabel(name), BorderLayout.WEST);
@@ -108,9 +110,9 @@ public class GUI extends JFrame {
         }
 
         return knownAgentsPanel;
-    }
+        }
 
-    private JPanel createParametersPanel() {
+        private JPanel createParametersPanel() {
         JPanel parametersPanel = new JPanel(new GridLayout(4, 2, 10, 10));
         parametersPanel.setBorder(BorderFactory.createTitledBorder("Parameters"));
 
@@ -130,16 +132,22 @@ public class GUI extends JFrame {
         parametersPanel.add(new JLabel("Inflation rate (I%):"));
         parametersPanel.add(iSpinner);
 
-        try {
-            int n = (Integer) nSpinner.getValue();
-            int s = (Integer) sSpinner.getValue();
-            int r = (Integer) rSpinner.getValue();
-            int i = (Integer) iSpinner.getValue();
-            MainAgent.setGameParameters(new GameParametersStruct(n, s, r, i));
-            appendLog("Parameters set to: N=" + n + ", S=" + s + ", R=" + r + ", I=" + i);
-        } catch (Exception e) {
-            appendLog("Invalid input for parameters.");
-        }
+        ChangeListener updateListener = e -> {
+            try {
+                int n = (Integer) nSpinner.getValue();
+                int s = (Integer) sSpinner.getValue();
+                int r = (Integer) rSpinner.getValue();
+                int i = (Integer) iSpinner.getValue();
+                MainAgent.setGameParameters(new GameParametersStruct(n, s, r, i));
+            } catch (Exception ex) {
+                appendLog("Invalid input for parameters.", false);
+            }
+        };
+
+        nSpinner.addChangeListener(updateListener);
+        sSpinner.addChangeListener(updateListener);
+        rSpinner.addChangeListener(updateListener);
+        iSpinner.addChangeListener(updateListener);
 
         return parametersPanel;
     }
@@ -236,26 +244,41 @@ public class GUI extends JFrame {
 
         private void handleDeleteAction() {
             // Implement the delete action here
-            appendLog("Delete button clicked");
+            appendLog("Delete button clicked", false);
         }
     }
 
 
     private void createLogPanel() {
-        logPanel = new JPanel();
-        logPanel.setBorder(BorderFactory.createTitledBorder("Log"));
+        logPanel = new JPanel(new BorderLayout());
+        
+        JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        titlePanel.add(new JLabel("Log"));
+        verboseCheckBox = new JCheckBox("Verbose");
+        verboseCheckBox.addActionListener(e -> MainAgent.setVerbose(verboseCheckBox.isSelected()));
+        titlePanel.add(verboseCheckBox);
+        
+        logPanel.add(titlePanel, BorderLayout.NORTH);
         logPanel.setPreferredSize(new Dimension(1200, 140));
+        
         logTextArea = new JTextArea();
         logTextArea.setEditable(false);
         logTextArea.setLineWrap(true);
         logTextArea.setWrapStyleWord(true);
+        
         JScrollPane scrollPane = new JScrollPane(logTextArea);
         scrollPane.setPreferredSize(new Dimension(1180, 120));
-        logPanel.add(scrollPane);
+        
+        logPanel.add(scrollPane, BorderLayout.CENTER);
         add(logPanel, BorderLayout.SOUTH);
+        logTextArea.setCaretPosition(logTextArea.getDocument().getLength());
     }
 
-    public void appendLog(String text) {
+    public void appendLog(String text, boolean verbose) {
+        if (verbose && !MainAgent.getVerbose()) {
+            return;
+        }
         logTextArea.append(text + "\n");
+        logTextArea.setCaretPosition(logTextArea.getDocument().getLength());
     }
 }

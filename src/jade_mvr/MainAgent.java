@@ -1,10 +1,45 @@
 package src.jade_mvr;
 
 import jade.core.Agent;
+import jade.wrapper.AgentContainer;
 
-public class MainAgent {
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import src.agents.*;
+import java.io.File;
+
+public class MainAgent extends Agent {
     private static GUI view;
     private static GameParametersStruct gameParameters;
+    private static boolean verbose = false;
+    private static ArrayList<String> agentsList = new ArrayList<String>();
+
+    private MainAgent() {
+        gameParameters = new GameParametersStruct();
+        initAgentsList();
+
+        view = new GUI();
+        // Show the GUI
+        view.setVisible(true);
+        view.appendLog("Application started", false);
+                        // getContainerController().createNewAgent("randomAgent#" + UUID.randomUUID().toString(), "src.jade_mvr.RandomAgent", null).start();
+
+    }
+
+    public static ArrayList<String> getAgentsList() {
+        return agentsList;
+    }
+
+    public static boolean getVerbose() {
+        return verbose;
+    }
+
+    public static void setVerbose(boolean verbose) {
+        MainAgent.verbose = verbose;
+        view.appendLog("Verbose set to: " + verbose, false);
+    }
 
     public static GameParametersStruct getGameParameters() {
         return gameParameters;
@@ -12,20 +47,27 @@ public class MainAgent {
 
     public static void setGameParameters(GameParametersStruct gameParameters) {
         MainAgent.gameParameters = gameParameters;
+        view.appendLog("Parameters set to: N=" + gameParameters.N + ", S=" + gameParameters.S + ", R=" + gameParameters.R + ", I=" + gameParameters.I, true);
     }
 
     public static void main(String[] args) {
-        gameParameters = new GameParametersStruct();
-        view = new GUI();
-        // Show the GUI
-        view.setVisible(true);
-        view.appendLog("Application started");
-        view.appendLog("Application started1");
-        view.appendLog("Application started2");
+        new MainAgent();
     }
 
-
-    private void updateView() {
+    private static void initAgentsList() {
+        agentsList.clear();
+        File agentsDir = new File("src/agents");
+        if (agentsDir.exists() && agentsDir.isDirectory()) {
+            File[] files = agentsDir.listFiles((dir, name) -> name.endsWith(".java"));
+            if (files != null) {
+                for (File file : files) {
+                    String fileName = file.getName();
+                    if (fileName.endsWith(".java")) {
+                        agentsList.add(fileName.substring(0, fileName.length() - 5));
+                    }
+                }
+            }
+        }
     }
 
     public static class GameParametersStruct {
@@ -34,11 +76,11 @@ public class MainAgent {
         int S;
         int I;
 
-        public GameParametersStruct() { // TODO: set default R=500, I=1
+        public GameParametersStruct() {
             N = 2;
-            R = 50;
+            R = 500;
             S = 4;
-            I = 0;
+            I = 1;
         }
 
         public GameParametersStruct(int n, int r, int s, int i) {
