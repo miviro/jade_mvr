@@ -1,51 +1,70 @@
 package src.jade_mvr;
 
 import javax.swing.*;
-import java.awt.event.ActionListener;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
 
 public class GUI extends JFrame {
-    private JButton incrementButton;
-    private JButton resetButton;
-    private JLabel counterLabel;
+    private JMenuBar menuBar;
+    private JMenu fileMenu;
+    private JMenu aboutMenu;
+    private JPanel actionsPanel;
+    private JPanel configPanel;
+    private JPanel rightPanel;
+    private JPanel statsPanel;
+    private JPanel logPanel;
 
     public GUI() {
-        // Configuración de la ventana
-        setTitle("Contador Simple");
-        setSize(300, 200);
+        setTitle("JADE MVR");
+        setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
 
-        // Componentes
-        incrementButton = new JButton("Incrementar");
-        resetButton = new JButton("Reiniciar");
-        counterLabel = new JLabel("Contador: 0", SwingConstants.CENTER);
-
-        // Layout
-        setLayout(new java.awt.BorderLayout());
-        add(counterLabel, java.awt.BorderLayout.CENTER);
-        add(incrementButton, java.awt.BorderLayout.NORTH);
-        add(resetButton, java.awt.BorderLayout.SOUTH);
+        createMenuBar();
+        createActionsPanel();
+        createConfigPanel();
+        createRightPanel();
+        createLogPanel();
     }
 
-    public void setCounterLabel(String text) {
-        counterLabel.setText(text);
+    private void createMenuBar() {
+        menuBar = new JMenuBar();
+        fileMenu = new JMenu("File");
+        aboutMenu = new JMenu("About");
+        menuBar.add(fileMenu);
+        menuBar.add(aboutMenu);
+        setJMenuBar(menuBar);
     }
 
-    public void addIncrementListener(ActionListener listener) {
-        incrementButton.addActionListener(listener);
+    private void createActionsPanel() {
+        actionsPanel = new JPanel();
+        actionsPanel.setBorder(BorderFactory.createTitledBorder("Actions"));
+        actionsPanel.setPreferredSize(new Dimension(800, 60));
+        add(actionsPanel, BorderLayout.NORTH);
     }
 
-    public void addResetListener(ActionListener listener) {
-        resetButton.addActionListener(listener);
+    private void createConfigPanel() {
+        configPanel = new JPanel();
+        configPanel.setBorder(BorderFactory.createTitledBorder("Configuration"));
+        configPanel.setPreferredSize(new Dimension(240, 540));
+        add(configPanel, BorderLayout.WEST);
     }
 
-    public static void main(String[] args) {
-        MainAgent logic = new MainAgent();
-        GUI gui = new GUI();
+    private void createRightPanel() {
+        rightPanel = new JPanel(new BorderLayout());
 
-        // Vincular la GUI con la lógica
-        logic.setView(gui);
+        statsPanel = new JPanel();
+        statsPanel.setBorder(BorderFactory.createTitledBorder("Stats"));
+        statsPanel.setPreferredSize(new Dimension(560, 300));
+        rightPanel.add(statsPanel, BorderLayout.CENTER);
 
-        // Hacer visible la ventana
-        gui.setVisible(true);
+        add(rightPanel, BorderLayout.CENTER);
+    }
+
+    private void createLogPanel() {
+        logPanel = new JPanel();
+        logPanel.setBorder(BorderFactory.createTitledBorder("Log"));
+        logPanel.setPreferredSize(new Dimension(800, 140));
+        add(logPanel, BorderLayout.SOUTH);
     }
 }
