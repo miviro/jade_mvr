@@ -25,6 +25,7 @@ public class GUI extends JFrame {
     private JPanel rightPanel;
     private JPanel statsPanel;
     private JPanel logPanel;
+    private JPanel knownAgentsPanel;
     private JButton newGameButton;
     private JButton resetStats;
     private JButton stopButton;
@@ -91,7 +92,8 @@ public class GUI extends JFrame {
         configPanel.setPreferredSize(new Dimension(340, 540));
 
         configPanel.add(createParametersPanel(), BorderLayout.NORTH);
-        configPanel.add(createKnownAgentsPanel(), BorderLayout.SOUTH);
+        knownAgentsPanel = createKnownAgentsPanel();
+        configPanel.add(knownAgentsPanel, BorderLayout.SOUTH);
 
         add(configPanel, BorderLayout.WEST);
     }
@@ -100,19 +102,29 @@ public class GUI extends JFrame {
         JPanel knownAgentsPanel = new JPanel();
         knownAgentsPanel.setBorder(BorderFactory.createTitledBorder("Known Agents"));
         knownAgentsPanel.setLayout(new BoxLayout(knownAgentsPanel, BoxLayout.Y_AXIS));
-        // Get agents from MainAgent
-        ArrayList<String> agentNames = MainAgent.getAgentsList();
-        for (String name : agentNames) {
+        
+        ArrayList<String> agentNames = MainAgent.getAgentTypesList();
+        int totalAgents = MainAgent.getGameParameters().N;
+        int baseAgentsPerType = totalAgents / agentNames.size();
+        int remainder = totalAgents % agentNames.size();
+
+        for (int i = 0; i < agentNames.size(); i++) {
             JPanel agentPanel = new JPanel(new BorderLayout());
-            agentPanel.add(new JLabel(name), BorderLayout.WEST);
-            agentPanel.add(new JSpinner(new SpinnerNumberModel(1, 1, 100, 1)), BorderLayout.EAST);
+            agentPanel.add(new JLabel(agentNames.get(i)), BorderLayout.WEST);
+            
+            // Last agent gets the remainder
+            int defaultValue = (i == agentNames.size() - 1) ? 
+                             baseAgentsPerType + remainder : 
+                             baseAgentsPerType;
+            
+            agentPanel.add(new JSpinner(new SpinnerNumberModel(defaultValue, 1, 100, 1)), BorderLayout.EAST);
             knownAgentsPanel.add(agentPanel);
         }
 
         return knownAgentsPanel;
-        }
+    }
 
-        private JPanel createParametersPanel() {
+    private JPanel createParametersPanel() {
         JPanel parametersPanel = new JPanel(new GridLayout(4, 2, 10, 10));
         parametersPanel.setBorder(BorderFactory.createTitledBorder("Parameters"));
 
@@ -139,8 +151,15 @@ public class GUI extends JFrame {
                 int r = (Integer) rSpinner.getValue();
                 int i = (Integer) iSpinner.getValue();
                 MainAgent.setGameParameters(new GameParametersStruct(n, s, r, i));
+                // Update known agents panel
+                configPanel.remove(knownAgentsPanel);
+                knownAgentsPanel = createKnownAgentsPanel();
+                configPanel.add(knownAgentsPanel, BorderLayout.SOUTH);
+                configPanel.revalidate();
+                configPanel.repaint();
             } catch (Exception ex) {
                 appendLog("Invalid input for parameters.", false);
+                appendLog(ex.getMessage(), true);
             }
         };
 
@@ -165,11 +184,11 @@ public class GUI extends JFrame {
     }
 
     private JPanel createStatsTablePanel() {
-        String[] columnNames = {"Name", "Wins", "Lose", "Draw", "Points", "Invested", "Last Actions", "Delete"};
+        String[] columnNames = { "Name", "Wins", "Lose", "Draw", "Points", "Invested", "Last Actions", "Delete" };
         Object[][] data = {
-            {"Agent A", 10, 5, 2, 32, 1000,  "Action 1", "Delete"},
-            {"Agent B", 8, 7, 1, 25, 800,  "Action 2", "Delete"},
-            // Add more rows as needed
+                { "Agent A", 10, 5, 2, 32, 1000, "Action 1", "Delete" },
+                { "Agent B", 8, 7, 1, 25, 800, "Action 2", "Delete" },
+                // Add more rows as needed
         };
 
         DefaultTableModel model = new DefaultTableModel(data, columnNames) {
@@ -198,7 +217,8 @@ public class GUI extends JFrame {
         }
 
         @Override
-        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
+                int row, int column) {
             setText((value == null) ? "" : value.toString());
             return this;
         }
@@ -213,7 +233,8 @@ public class GUI extends JFrame {
         }
 
         @Override
-        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
+        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row,
+                int column) {
             label = (value == null) ? "" : value.toString();
             JButton button = new JButton(label);
             button.addActionListener(e -> fireEditingStopped());
@@ -248,27 +269,26 @@ public class GUI extends JFrame {
         }
     }
 
-
     private void createLogPanel() {
         logPanel = new JPanel(new BorderLayout());
-        
+
         JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         titlePanel.add(new JLabel("Log"));
         verboseCheckBox = new JCheckBox("Verbose");
         verboseCheckBox.addActionListener(e -> MainAgent.setVerbose(verboseCheckBox.isSelected()));
         titlePanel.add(verboseCheckBox);
-        
+
         logPanel.add(titlePanel, BorderLayout.NORTH);
         logPanel.setPreferredSize(new Dimension(1200, 140));
-        
+
         logTextArea = new JTextArea();
         logTextArea.setEditable(false);
         logTextArea.setLineWrap(true);
         logTextArea.setWrapStyleWord(true);
-        
+
         JScrollPane scrollPane = new JScrollPane(logTextArea);
         scrollPane.setPreferredSize(new Dimension(1180, 120));
-        
+
         logPanel.add(scrollPane, BorderLayout.CENTER);
         add(logPanel, BorderLayout.SOUTH);
         logTextArea.setCaretPosition(logTextArea.getDocument().getLength());

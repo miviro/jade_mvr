@@ -1,35 +1,83 @@
 package src.jade_mvr;
 
+import jade.core.AID;
 import jade.core.Agent;
-import jade.wrapper.AgentContainer;
+import jade.core.behaviours.SimpleBehaviour;
+import jade.wrapper.StaleProxyException;
+import jade.domain.DFService;
+import jade.domain.FIPAException;
+import jade.domain.FIPAAgentManagement.DFAgentDescription;
+import jade.domain.FIPAAgentManagement.ServiceDescription;
 
 import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
-import src.agents.*;
 import java.io.File;
 
 public class MainAgent extends Agent {
     private static GUI view;
-    private static GameParametersStruct gameParameters;
+    private static GameParametersStruct gameParameters = new GameParametersStruct();;
     private static boolean verbose = false;
-    private static ArrayList<String> agentsList = new ArrayList<String>();
+    private static ArrayList<String> agentTypesList = new ArrayList<String>();
 
-    private MainAgent() {
-        gameParameters = new GameParametersStruct();
-        initAgentsList();
-
-        view = new GUI();
-        // Show the GUI
-        view.setVisible(true);
-        view.appendLog("Application started", false);
-                        // getContainerController().createNewAgent("randomAgent#" + UUID.randomUUID().toString(), "src.jade_mvr.RandomAgent", null).start();
+    @Override
+    protected void setup() {
 
     }
 
-    public static ArrayList<String> getAgentsList() {
-        return agentsList;
+    public int updatePlayers() {
+        view.appendLog("Updating player list", false);
+        DFAgentDescription template = new DFAgentDescription();
+        ServiceDescription sd = new ServiceDescription();
+        sd.setType("Player");
+        template.addServices(sd);
+        try {
+            DFAgentDescription[] result = DFService.search(this, template);
+            if (result.length > 0) {
+                view.appendLog("Found " + result.length + " players", false);
+            }
+            //playerAgents = new AID[result.length];
+            for (int i = 0; i < result.length; ++i) {
+             //   playerAgents[i] = result[i].getName();
+            }
+        } catch (FIPAException fe) {
+            view.appendLog(fe.getMessage(), true);
+        }
+
+        return 0;
+    }
+
+    public MainAgent() {
+        setup();
+        addBehaviour(new GameManager());
+    }
+
+    private class GameManager extends SimpleBehaviour {
+
+        @Override
+        public void action() {
+            System.out.println("GameManager");
+            initAgentTypesList();
+            view = new GUI();
+            view.setVisible(true);
+            
+            updatePlayers();
+            view.appendLog("Application started", false);
+            try {
+                getContainerController().createNewAgent("randomAgent#1", "src.jade_mvr.RandomAgent", null).start();
+            } catch (StaleProxyException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
+
+        @Override
+        public boolean done() {
+            return true;
+        }
+    }
+
+    public static ArrayList<String> getAgentTypesList() {
+        return agentTypesList;
     }
 
     public static boolean getVerbose() {
@@ -54,8 +102,8 @@ public class MainAgent extends Agent {
         new MainAgent();
     }
 
-    private static void initAgentsList() {
-        agentsList.clear();
+    private static void initAgentTypesList() {
+        agentTypesList.clear();
         File agentsDir = new File("src/agents");
         if (agentsDir.exists() && agentsDir.isDirectory()) {
             File[] files = agentsDir.listFiles((dir, name) -> name.endsWith(".java"));
@@ -63,7 +111,7 @@ public class MainAgent extends Agent {
                 for (File file : files) {
                     String fileName = file.getName();
                     if (fileName.endsWith(".java")) {
-                        agentsList.add(fileName.substring(0, fileName.length() - 5));
+                        agentTypesList.add(fileName.substring(0, fileName.length() - 5));
                     }
                 }
             }
