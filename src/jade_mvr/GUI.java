@@ -1,11 +1,14 @@
 package src.jade_mvr;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
 import javax.swing.text.NumberFormatter;
 
 import src.jade_mvr.MainAgent.GameParametersStruct;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.text.DecimalFormat;
@@ -20,6 +23,7 @@ public class GUI extends JFrame {
     private JPanel statsPanel;
     private JPanel logPanel;
     private JButton newGameButton;
+    private JButton resetStats;
     private JButton stopButton;
     private JButton continueButton;
     private JButton playAllRoundsButton;
@@ -30,7 +34,7 @@ public class GUI extends JFrame {
 
     public GUI() {
         setTitle("JADE MVR");
-        setSize(800, 600);
+        setSize(1200, 800);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
@@ -53,18 +57,20 @@ public class GUI extends JFrame {
     private void createActionsPanel() {
         actionsPanel = new JPanel();
         actionsPanel.setBorder(BorderFactory.createTitledBorder("Actions"));
-        actionsPanel.setPreferredSize(new Dimension(800, 60));
+        actionsPanel.setPreferredSize(new Dimension(1200, 60));
 
         newGameButton = new JButton("New Game");
+        resetStats = new JButton("Reset Stats");
         stopButton = new JButton("Stop");
         continueButton = new JButton("Continue");
         playAllRoundsButton = new JButton("Play All Rounds");
 
         playXRoundsButton = new JButton("Play");
         playXRoundsSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 1000, 1));
-        playXRoundsLabel = new JLabel("rounds:");
+        playXRoundsLabel = new JLabel("rounds");
 
         actionsPanel.add(newGameButton);
+        actionsPanel.add(resetStats);
         actionsPanel.add(stopButton);
         actionsPanel.add(continueButton);
         actionsPanel.add(playAllRoundsButton);
@@ -78,51 +84,62 @@ public class GUI extends JFrame {
     private void createConfigPanel() {
         configPanel = new JPanel(new BorderLayout());
         configPanel.setBorder(BorderFactory.createTitledBorder("Configuration"));
-        configPanel.setPreferredSize(new Dimension(240, 540));
-
-        JPanel bottomConfigPanel = new JPanel();
-        bottomConfigPanel.setBorder(BorderFactory.createTitledBorder("Bottom Configuration"));
-        bottomConfigPanel.setPreferredSize(new Dimension(240, 270));
+        configPanel.setPreferredSize(new Dimension(340, 540));
 
         configPanel.add(createParametersPanel(), BorderLayout.NORTH);
-        configPanel.add(bottomConfigPanel, BorderLayout.SOUTH);
+        configPanel.add(createKnownAgentsPanel(), BorderLayout.SOUTH);
 
         add(configPanel, BorderLayout.WEST);
     }
 
+    private JPanel createKnownAgentsPanel() {
+        JPanel knownAgentsPanel = new JPanel();
+        knownAgentsPanel.setBorder(BorderFactory.createTitledBorder("Known Agents"));
+        knownAgentsPanel.setLayout(new BoxLayout(knownAgentsPanel, BoxLayout.Y_AXIS));
+       // knownAgentsPanel.setPreferredSize(new Dimension(440, 370));
+
+        // Example agents
+        String[] agentNames = {"Agent A", "Agent B", "Agent C", "Agent D","Agent X","Agent D","Agent D","Agent D","Agent D", "Agent E"};
+        for (String name : agentNames) {
+            JPanel agentPanel = new JPanel(new BorderLayout());
+            agentPanel.add(new JLabel(name), BorderLayout.WEST);
+            agentPanel.add(new JSpinner(new SpinnerNumberModel(1, 1, 100, 1)), BorderLayout.EAST);
+            knownAgentsPanel.add(agentPanel);
+        }
+
+        return knownAgentsPanel;
+    }
+
     private JPanel createParametersPanel() {
         JPanel parametersPanel = new JPanel(new GridLayout(4, 2, 10, 10));
+        parametersPanel.setBorder(BorderFactory.createTitledBorder("Parameters"));
+
         // Retrieve current parameters
         GameParametersStruct params = MainAgent.getGameParameters();
-        // Create number-only formatted text fields with default values
-        JFormattedTextField nField = new JFormattedTextField(new NumberFormatter(new DecimalFormat("#")));
-        nField.setValue(params.N);
-        JFormattedTextField sField = new JFormattedTextField(new NumberFormatter(new DecimalFormat("#")));
-        sField.setValue(params.S);
-        JFormattedTextField rField = new JFormattedTextField(new NumberFormatter(new DecimalFormat("#")));
-        rField.setValue(params.R);
-        JFormattedTextField iField = new JFormattedTextField(new NumberFormatter(new DecimalFormat("#")));
-        iField.setValue(params.I);
+        // Create spinners with default values
+        JSpinner nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 1000, 1));
+        JSpinner sSpinner = new JSpinner(new SpinnerNumberModel(params.S, 0, 100, 1));
+        JSpinner rSpinner = new JSpinner(new SpinnerNumberModel(params.R, 1, 1000, 1));
+        JSpinner iSpinner = new JSpinner(new SpinnerNumberModel(params.I, 0, 100, 1));
         parametersPanel.add(new JLabel("Number of players (N):"));
-        parametersPanel.add(nField);
+        parametersPanel.add(nSpinner);
         parametersPanel.add(new JLabel("Stock exchange fee (S%):"));
-        parametersPanel.add(sField);
+        parametersPanel.add(sSpinner);
         parametersPanel.add(new JLabel("Number of rounds (R):"));
-        parametersPanel.add(rField);
+        parametersPanel.add(rSpinner);
         parametersPanel.add(new JLabel("Inflation rate (I%):"));
-        parametersPanel.add(iField);
+        parametersPanel.add(iSpinner);
 
-            try {
-                int n = ((Number) nField.getValue()).intValue();
-                int s = ((Number) sField.getValue()).intValue();
-                int r = ((Number) rField.getValue()).intValue();
-                int i = ((Number) iField.getValue()).intValue();
-                MainAgent.setGameParameters(new GameParametersStruct(n, s, r, i));
-                appendLog("Parameters set to: N=" + n + ", S=" + s + ", R=" + r + ", I=" + i);
-            } catch (Exception e) {
-                appendLog("Invalid input for parameters.");
-            }
-        
+        try {
+            int n = (Integer) nSpinner.getValue();
+            int s = (Integer) sSpinner.getValue();
+            int r = (Integer) rSpinner.getValue();
+            int i = (Integer) iSpinner.getValue();
+            MainAgent.setGameParameters(new GameParametersStruct(n, s, r, i));
+            appendLog("Parameters set to: N=" + n + ", S=" + s + ", R=" + r + ", I=" + i);
+        } catch (Exception e) {
+            appendLog("Invalid input for parameters.");
+        }
 
         return parametersPanel;
     }
@@ -130,24 +147,110 @@ public class GUI extends JFrame {
     private void createRightPanel() {
         rightPanel = new JPanel(new BorderLayout());
 
-        statsPanel = new JPanel();
+        statsPanel = new JPanel(new BorderLayout());
         statsPanel.setBorder(BorderFactory.createTitledBorder("Stats"));
         statsPanel.setPreferredSize(new Dimension(560, 300));
+        statsPanel.add(createStatsTablePanel(), BorderLayout.CENTER);
         rightPanel.add(statsPanel, BorderLayout.CENTER);
 
         add(rightPanel, BorderLayout.CENTER);
     }
 
+    private JPanel createStatsTablePanel() {
+        String[] columnNames = {"Name", "Wins", "Lose", "Draw", "Points", "Invested", "Last Actions", "Delete"};
+        Object[][] data = {
+            {"Agent A", 10, 5, 2, 32, 1000,  "Action 1", "Delete"},
+            {"Agent B", 8, 7, 1, 25, 800,  "Action 2", "Delete"},
+            // Add more rows as needed
+        };
+
+        DefaultTableModel model = new DefaultTableModel(data, columnNames) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 8; // Only the "Delete" column is editable
+            }
+        };
+
+        JTable table = new JTable(model);
+        table.getColumn("Delete").setCellRenderer(new ButtonRenderer());
+        table.getColumn("Delete").setCellEditor(new ButtonEditor(new JCheckBox()));
+
+        JScrollPane scrollPane = new JScrollPane(table);
+        table.setFillsViewportHeight(true);
+
+        JPanel tablePanel = new JPanel(new BorderLayout());
+        tablePanel.add(scrollPane, BorderLayout.CENTER);
+
+        return tablePanel;
+    }
+
+    class ButtonRenderer extends JButton implements TableCellRenderer {
+        public ButtonRenderer() {
+            setOpaque(true);
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+            setText((value == null) ? "" : value.toString());
+            return this;
+        }
+    }
+
+    class ButtonEditor extends DefaultCellEditor {
+        private String label;
+        private boolean isPushed;
+
+        public ButtonEditor(JCheckBox checkBox) {
+            super(checkBox);
+        }
+
+        @Override
+        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row, int column) {
+            label = (value == null) ? "" : value.toString();
+            JButton button = new JButton(label);
+            button.addActionListener(e -> fireEditingStopped());
+            isPushed = true;
+            return button;
+        }
+
+        @Override
+        public Object getCellEditorValue() {
+            if (isPushed) {
+                // Call the function to handle the delete action
+                handleDeleteAction();
+            }
+            isPushed = false;
+            return label;
+        }
+
+        @Override
+        public boolean stopCellEditing() {
+            isPushed = false;
+            return super.stopCellEditing();
+        }
+
+        @Override
+        protected void fireEditingStopped() {
+            super.fireEditingStopped();
+        }
+
+        private void handleDeleteAction() {
+            // Implement the delete action here
+            appendLog("Delete button clicked");
+        }
+    }
+
+
     private void createLogPanel() {
         logPanel = new JPanel();
         logPanel.setBorder(BorderFactory.createTitledBorder("Log"));
-        logPanel.setPreferredSize(new Dimension(800, 140));
+        logPanel.setPreferredSize(new Dimension(1200, 140));
         logTextArea = new JTextArea();
         logTextArea.setEditable(false);
         logTextArea.setLineWrap(true);
         logTextArea.setWrapStyleWord(true);
         JScrollPane scrollPane = new JScrollPane(logTextArea);
-        scrollPane.setPreferredSize(new Dimension(780, 120));
+        scrollPane.setPreferredSize(new Dimension(1180, 120));
         logPanel.add(scrollPane);
         add(logPanel, BorderLayout.SOUTH);
     }
