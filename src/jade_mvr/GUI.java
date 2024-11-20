@@ -2,9 +2,12 @@ package src.jade_mvr;
 
 import javax.swing.*;
 import javax.swing.event.ChangeListener;
+import javax.swing.event.HyperlinkEvent;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.text.NumberFormatter;
+
+import com.formdev.flatlaf.util.SwingUtils;
 
 import src.jade_mvr.MainAgent.GameParametersStruct;
 
@@ -13,13 +16,14 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
+import java.net.URI;
+import java.awt.Desktop;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 
 public class GUI extends JFrame {
     private JMenuBar menuBar;
-    private JMenu fileMenu;
-    private JMenu aboutMenu;
+    private JMenu quitMenu;
     private JPanel actionsPanel;
     private JPanel configPanel;
     private JPanel rightPanel;
@@ -27,12 +31,17 @@ public class GUI extends JFrame {
     private JPanel logPanel;
     private JPanel knownAgentsPanel;
     private JButton newGameButton;
+    private JButton quitGameButton;
     private JButton resetStats;
     private JButton stopButton;
     private JButton continueButton;
     private JButton playAllRoundsButton;
     private JButton playXRoundsButton;
     private JSpinner playXRoundsSpinner;
+    JSpinner nSpinner;
+    JSpinner sSpinner;
+    JSpinner rSpinner;
+    JSpinner iSpinner;
     private JLabel playXRoundsLabel;
     private JTextArea logTextArea;
     private JCheckBox verboseCheckBox;
@@ -52,11 +61,92 @@ public class GUI extends JFrame {
 
     private void createMenuBar() {
         menuBar = new JMenuBar();
-        fileMenu = new JMenu("File");
-        aboutMenu = new JMenu("About");
-        menuBar.add(fileMenu);
-        menuBar.add(aboutMenu);
+        quitMenu = new JMenu("Quit");
+        JMenuItem confirmMenuItem = new JMenuItem("Confirm");
+        confirmMenuItem.addActionListener(actionEvent -> {
+            System.exit(0);
+        });
+        quitMenu.add(confirmMenuItem);
+
+        // About
+        // TODO: Reducir anchura de About
+        JMenuItem aboutMenuItem = new JMenuItem("About");
+        aboutMenuItem.addActionListener(actionEvent -> {
+            String message = "<html>Author: Miguel Vila Rodríguez<br>Date: 13-11-2024<br>" +
+                    "Website: <a href='https://miviro.es'>https://miviro.es</a><br>" +
+                    "GitHub: <a href='https://github.com/miviro/jade_mvr'>https://github.com/miviro/jade_mvr</a></html>";
+            JEditorPane editorPane = new JEditorPane("text/html", message);
+            editorPane.setEditable(false);
+            editorPane.setOpaque(false);
+            editorPane.addHyperlinkListener(e -> {
+                if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+                    try {
+                        Desktop.getDesktop().browse(new URI(e.getURL().toString()));
+                    } catch (Exception ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            });
+            JOptionPane.showMessageDialog(this, editorPane, "About", JOptionPane.INFORMATION_MESSAGE);
+        });
+
+        menuBar.add(quitMenu);
+        menuBar.add(aboutMenuItem);
         setJMenuBar(menuBar);
+    }
+
+    private void newGame() {
+        int totalAgents = 0;
+        for (Component component : knownAgentsPanel.getComponents()) {
+            if (component instanceof JPanel) {
+                JPanel agentPanel = (JPanel) component;
+                for (Component subComponent : agentPanel.getComponents()) {
+                    if (subComponent instanceof JSpinner) {
+                        totalAgents += (Integer) ((JSpinner) subComponent).getValue();
+                    }
+                }
+            }
+        }
+
+        if (totalAgents != MainAgent.getGameParameters().N) {
+            appendLog("The sum of agents (" + totalAgents + ") does not match the total number of players ("
+                    + MainAgent.getGameParameters().N + ").", false);
+            return;
+        }
+
+        // grafico
+        appendLog("New game started", false);
+
+        newGameButton.setEnabled(false);
+        quitGameButton.setEnabled(true);
+        resetStats.setEnabled(true);
+        stopButton.setEnabled(false);
+        continueButton.setEnabled(false);
+        playAllRoundsButton.setEnabled(true);
+        playXRoundsButton.setEnabled(true);
+        playXRoundsSpinner.setEnabled(true);
+
+        setPanelEnabled(configPanel, false);
+
+        // TODO: hacer new game
+    }
+
+    private void quitGame() {
+        // grafico
+        appendLog("Game finished", false);
+
+        newGameButton.setEnabled(true);
+        quitGameButton.setEnabled(false);
+        resetStats.setEnabled(false);
+        stopButton.setEnabled(false);
+        continueButton.setEnabled(false);
+        playAllRoundsButton.setEnabled(false);
+        playXRoundsButton.setEnabled(false);
+        playXRoundsSpinner.setEnabled(false);
+
+        setPanelEnabled(configPanel, true);
+
+        // TODO: reestablecer todo
     }
 
     private void createActionsPanel() {
@@ -65,16 +155,30 @@ public class GUI extends JFrame {
         actionsPanel.setPreferredSize(new Dimension(1200, 60));
 
         newGameButton = new JButton("New Game");
+        newGameButton.addActionListener(e -> newGame());
+
+        quitGameButton = new JButton("Quit Game");
+        quitGameButton.setEnabled(false);
+        quitGameButton.addActionListener(e -> quitGame());
+
         resetStats = new JButton("Reset Stats");
+        resetStats.setEnabled(false);
+
         stopButton = new JButton("Stop");
+        stopButton.setEnabled(false);
         continueButton = new JButton("Continue");
+        continueButton.setEnabled(false);
         playAllRoundsButton = new JButton("Play All Rounds");
+        playAllRoundsButton.setEnabled(false);
 
         playXRoundsButton = new JButton("Play");
+        playXRoundsButton.setEnabled(false);
         playXRoundsSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 1000, 1));
+        playXRoundsSpinner.setEnabled(false);
         playXRoundsLabel = new JLabel("rounds");
 
         actionsPanel.add(newGameButton);
+        actionsPanel.add(quitGameButton);
         actionsPanel.add(resetStats);
         actionsPanel.add(stopButton);
         actionsPanel.add(continueButton);
@@ -84,6 +188,19 @@ public class GUI extends JFrame {
         actionsPanel.add(playXRoundsLabel);
 
         add(actionsPanel, BorderLayout.NORTH);
+    }
+
+    void setPanelEnabled(JPanel panel, Boolean isEnabled) {
+        panel.setEnabled(isEnabled);
+
+        Component[] components = panel.getComponents();
+
+        for (Component component : components) {
+            if (component instanceof JPanel) {
+                setPanelEnabled((JPanel) component, isEnabled);
+            }
+            component.setEnabled(isEnabled);
+        }
     }
 
     private void createConfigPanel() {
@@ -102,7 +219,7 @@ public class GUI extends JFrame {
         JPanel knownAgentsPanel = new JPanel();
         knownAgentsPanel.setBorder(BorderFactory.createTitledBorder("Known Agents"));
         knownAgentsPanel.setLayout(new BoxLayout(knownAgentsPanel, BoxLayout.Y_AXIS));
-        
+
         ArrayList<String> agentNames = MainAgent.getAgentTypesList();
         int totalAgents = MainAgent.getGameParameters().N;
         int baseAgentsPerType = totalAgents / agentNames.size();
@@ -111,12 +228,10 @@ public class GUI extends JFrame {
         for (int i = 0; i < agentNames.size(); i++) {
             JPanel agentPanel = new JPanel(new BorderLayout());
             agentPanel.add(new JLabel(agentNames.get(i)), BorderLayout.WEST);
-            
+
             // Last agent gets the remainder
-            int defaultValue = (i == agentNames.size() - 1) ? 
-                             baseAgentsPerType + remainder : 
-                             baseAgentsPerType;
-            
+            int defaultValue = (i == agentNames.size() - 1) ? baseAgentsPerType + remainder : baseAgentsPerType;
+
             agentPanel.add(new JSpinner(new SpinnerNumberModel(defaultValue, 1, 100, 1)), BorderLayout.EAST);
             knownAgentsPanel.add(agentPanel);
         }
@@ -131,10 +246,10 @@ public class GUI extends JFrame {
         // Retrieve current parameters
         GameParametersStruct params = MainAgent.getGameParameters();
         // Create spinners with default values
-        JSpinner nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 1000, 1));
-        JSpinner sSpinner = new JSpinner(new SpinnerNumberModel(params.S, 0, 100, 1));
-        JSpinner rSpinner = new JSpinner(new SpinnerNumberModel(params.R, 1, 1000, 1));
-        JSpinner iSpinner = new JSpinner(new SpinnerNumberModel(params.I, 0, 100, 1));
+        nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 1000, 1));
+        sSpinner = new JSpinner(new SpinnerNumberModel(params.S, 0, 100, 1));
+        rSpinner = new JSpinner(new SpinnerNumberModel(params.R, 1, 1000, 1));
+        iSpinner = new JSpinner(new SpinnerNumberModel(params.I, 0, 100, 1));
         parametersPanel.add(new JLabel("Number of players (N):"));
         parametersPanel.add(nSpinner);
         parametersPanel.add(new JLabel("Stock exchange fee (S%):"));

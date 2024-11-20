@@ -35,9 +35,9 @@ public class MainAgent extends Agent {
             if (result.length > 0) {
                 view.appendLog("Found " + result.length + " players", false);
             }
-            //playerAgents = new AID[result.length];
+            // playerAgents = new AID[result.length];
             for (int i = 0; i < result.length; ++i) {
-             //   playerAgents[i] = result[i].getName();
+                // playerAgents[i] = result[i].getName();
             }
         } catch (FIPAException fe) {
             view.appendLog(fe.getMessage(), true);
@@ -59,11 +59,11 @@ public class MainAgent extends Agent {
             initAgentTypesList();
             view = new GUI();
             view.setVisible(true);
-            
+
             updatePlayers();
             view.appendLog("Application started", false);
             try {
-                getContainerController().createNewAgent("randomAgent#1", "src.jade_mvr.RandomAgent", null).start();
+                getContainerController().createNewAgent("randomAgent#1", "src.agents.RandomAgent", null).start();
             } catch (StaleProxyException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -95,7 +95,8 @@ public class MainAgent extends Agent {
 
     public static void setGameParameters(GameParametersStruct gameParameters) {
         MainAgent.gameParameters = gameParameters;
-        view.appendLog("Parameters set to: N=" + gameParameters.N + ", S=" + gameParameters.S + ", R=" + gameParameters.R + ", I=" + gameParameters.I, true);
+        view.appendLog("Parameters set to: N=" + gameParameters.N + ", S=" + gameParameters.S + ", R="
+                + gameParameters.R + ", I=" + gameParameters.I, true);
     }
 
     public static void main(String[] args) {
@@ -141,7 +142,7 @@ public class MainAgent extends Agent {
         @Override
         public String toString() {
             return "N=" + N +
-            ", R=" + R +
+                    ", R=" + R +
                     ", S=" + S +
                     ", I=" + I;
         }

@@ -13,13 +13,16 @@
                 "bin/",
                 "-cp",
                 "lib/*",
+                "src/agents/*.java",
                 "src/jade_mvr/*.java"
             ],
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
-            "problemMatcher": ["$tsc"]
+            "problemMatcher": [
+                "$tsc"
+            ]
         }
     ]
 }

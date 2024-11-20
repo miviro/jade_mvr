@@ -4,20 +4,6 @@
     "configurations": [
         {
             "type": "java",
-            "name": "MainAgent",
-            "request": "launch",
-            "mainClass": "src.jade_mvr.MainAgent",
-            "projectName": "jade_mvr_a8f32e5"
-        },
-        {
-            "type": "java",
-            "name": "GUI",
-            "request": "launch",
-            "mainClass": "src.jade_mvr.GUI",
-            "projectName": "jade_mvr_a8f32e5"
-        },
-        {
-            "type": "java",
             "name": "Launch JADE Boot",
             "request": "launch",
             "mainClass": "jade.Boot",
