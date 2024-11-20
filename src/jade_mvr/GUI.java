@@ -38,13 +38,10 @@ public class GUI extends JFrame {
     private JButton playAllRoundsButton;
     private JButton playXRoundsButton;
     private JSpinner playXRoundsSpinner;
-    JSpinner nSpinner;
-    JSpinner sSpinner;
-    JSpinner rSpinner;
-    JSpinner iSpinner;
     private JLabel playXRoundsLabel;
     private JTextArea logTextArea;
     private JCheckBox verboseCheckBox;
+    private DefaultTableModel statsTableModel;
 
     public GUI() {
         setTitle("JADE MVR");
@@ -129,6 +126,8 @@ public class GUI extends JFrame {
         setPanelEnabled(configPanel, false);
 
         // TODO: hacer new game
+        updateStatsTable(new Object[][] { { "Agent1", 0, 0, 0, 0, 0, "Actions", "Delete" },
+                { "Agent2", 0, 0, 0, 0, 0, "Actions", "Delete" } });
     }
 
     private void quitGame() {
@@ -246,10 +245,10 @@ public class GUI extends JFrame {
         // Retrieve current parameters
         GameParametersStruct params = MainAgent.getGameParameters();
         // Create spinners with default values
-        nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 1000, 1));
-        sSpinner = new JSpinner(new SpinnerNumberModel(params.S, 0, 100, 1));
-        rSpinner = new JSpinner(new SpinnerNumberModel(params.R, 1, 1000, 1));
-        iSpinner = new JSpinner(new SpinnerNumberModel(params.I, 0, 100, 1));
+        JSpinner nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 1000, 1));
+        JSpinner sSpinner = new JSpinner(new SpinnerNumberModel(params.S, 0, 100, 1));
+        JSpinner rSpinner = new JSpinner(new SpinnerNumberModel(params.R, 1, 1000, 1));
+        JSpinner iSpinner = new JSpinner(new SpinnerNumberModel(params.I, 0, 100, 1));
         parametersPanel.add(new JLabel("Number of players (N):"));
         parametersPanel.add(nSpinner);
         parametersPanel.add(new JLabel("Stock exchange fee (S%):"));
@@ -300,11 +299,7 @@ public class GUI extends JFrame {
 
     private JPanel createStatsTablePanel() {
         String[] columnNames = { "Name", "Wins", "Lose", "Draw", "Points", "Invested", "Last Actions", "Delete" };
-        Object[][] data = {
-                { "Agent A", 10, 5, 2, 32, 1000, "Action 1", "Delete" },
-                { "Agent B", 8, 7, 1, 25, 800, "Action 2", "Delete" },
-                // Add more rows as needed
-        };
+        Object[][] data = {};
 
         DefaultTableModel model = new DefaultTableModel(data, columnNames) {
             @Override
@@ -324,6 +319,14 @@ public class GUI extends JFrame {
         tablePanel.add(scrollPane, BorderLayout.CENTER);
 
         return tablePanel;
+    }
+
+    public void updateStatsTable(Object[][] data) {
+        // TODO: inicializar statsTableModel
+        statsTableModel.setRowCount(0);
+        for (Object[] row : data) {
+            statsTableModel.addRow(row);
+        }
     }
 
     class ButtonRenderer extends JButton implements TableCellRenderer {
