@@ -3,6 +3,7 @@ package src.jade_mvr;
 import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.SimpleBehaviour;
+import jade.wrapper.ControllerException;
 import jade.wrapper.StaleProxyException;
 import jade.domain.DFService;
 import jade.domain.FIPAException;
@@ -11,6 +12,11 @@ import jade.domain.FIPAAgentManagement.ServiceDescription;
 
 import java.util.ArrayList;
 
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+
+import java.awt.Component;
 import java.io.File;
 
 public class MainAgent extends Agent {
@@ -51,6 +57,143 @@ public class MainAgent extends Agent {
         addBehaviour(new GameManager());
     }
 
+    private void startNewGame() {
+        int totalAgents = 0;
+        for (Component component : view.knownAgentsPanel.getComponents()) {
+            if (component instanceof JPanel) {
+                JPanel agentPanel = (JPanel) component;
+                for (Component subComponent : agentPanel.getComponents()) {
+                    if (subComponent instanceof JSpinner) {
+                        totalAgents += (Integer) ((JSpinner) subComponent).getValue();
+                    }
+                }
+            }
+        }
+
+        if (totalAgents != MainAgent.getGameParameters().N) {
+            view.appendLog("The sum of agents (" + totalAgents + ") does not match the total number of players ("
+                    + MainAgent.getGameParameters().N + ").", false);
+            return;
+        }
+
+        // grafico
+        view.appendLog("New game started", false);
+
+        view.newGameButton.setEnabled(false);
+        view.quitGameButton.setEnabled(true);
+        view.resetStatsButton.setEnabled(true);
+        view.stopButton.setEnabled(false);
+        view.continueButton.setEnabled(false);
+        view.playAllRoundsButton.setEnabled(true);
+        view.playXRoundsButton.setEnabled(true);
+        view.playXRoundsSpinner.setEnabled(true);
+
+        view.setPanelEnabled(view.configPanel, false);
+
+        view.appendLog("Starting new game", false);
+
+        // Añadir jugadores a la tabla de estadísticas
+        Object[][] data = new Object[getGameParameters().N][8];
+        int agentIndex = 0;
+
+        for (Component component : view.knownAgentsPanel.getComponents()) {
+            if (component instanceof JPanel) {
+                JPanel agentPanel = (JPanel) component;
+                String agentType = null;
+                int agentCount = 0;
+
+                for (Component subComponent : agentPanel.getComponents()) {
+                    if (subComponent instanceof JSpinner) {
+                        agentCount = (Integer) ((JSpinner) subComponent).getValue();
+                    } else if (subComponent instanceof JLabel) {
+                        agentType = ((JLabel) subComponent).getText();
+                    }
+                }
+
+                if (agentType != null && agentCount > 0) {
+                    for (int i = 0; i < agentCount; i++) {
+                        data[agentIndex][0] = agentType + agentIndex;
+                        data[agentIndex][1] = 0; // Wins
+                        data[agentIndex][2] = 0; // Lose
+                        data[agentIndex][3] = 0; // Draw
+                        data[agentIndex][4] = 0; // Points
+                        data[agentIndex][5] = 0; // Invested
+                        data[agentIndex][6] = ""; // Last Actions
+                        data[agentIndex][7] = "Delete"; // Delete button
+
+                        try {
+                            getContainerController()
+                                    .createNewAgent(agentType + agentIndex, "src.agents." + agentType, null).start();
+                        } catch (Exception e) {
+                            view.appendLog("Could not create agent " + agentType + ": " + e.getMessage(), true);
+                        }
+
+                        agentIndex++;
+                    }
+                }
+            }
+        }
+
+        view.updateStatsTable(data);
+    }
+
+    private void quitGame() {
+        // grafico
+        view.appendLog("Game finished", false);
+
+        view.newGameButton.setEnabled(true);
+        view.quitGameButton.setEnabled(false);
+        view.resetStatsButton.setEnabled(false);
+        view.stopButton.setEnabled(false);
+        view.continueButton.setEnabled(false);
+        view.playAllRoundsButton.setEnabled(false);
+        view.playXRoundsButton.setEnabled(false);
+        view.playXRoundsSpinner.setEnabled(false);
+
+        view.setPanelEnabled(view.configPanel, true);
+
+        // Remove all entries from the table
+        view.updateStatsTable(new Object[0][8]);
+
+        // Kill all agents
+        DFAgentDescription template = new DFAgentDescription();
+        ServiceDescription sd = new ServiceDescription();
+        sd.setType("Player");
+        template.addServices(sd);
+        try {
+            DFAgentDescription[] result = DFService.search(this, template);
+            for (DFAgentDescription agentDesc : result) {
+            AID agentID = agentDesc.getName();
+            try {
+                getContainerController().getAgent(agentID.getLocalName()).kill();
+            } catch (StaleProxyException e) {
+                view.appendLog("Could not kill agent " + agentID.getLocalName() + ": " + e.getMessage(), true);
+            } catch (ControllerException e) {
+                view.appendLog("Could not kill agent " + agentID.getLocalName() + ": " + e.getMessage(), true);
+                e.printStackTrace();
+            }
+            }
+        } catch (FIPAException fe) {
+            view.appendLog(fe.getMessage(), true);
+        }
+    }
+
+    private void resetStats() {
+        // grafico
+        view.appendLog("Stats reset", false);
+
+        // Reset stats in the table model
+        for (int i = 0; i < view.statsTableModel.getRowCount(); i++) {
+            view.statsTableModel.setValueAt(0, i, 1); // Wins
+            view.statsTableModel.setValueAt(0, i, 2); // Losses
+            view.statsTableModel.setValueAt(0, i, 3); // Draws
+            view.statsTableModel.setValueAt(0, i, 4); // Points
+            view.statsTableModel.setValueAt(0, i, 5); // Invested
+            view.statsTableModel.setValueAt("", i, 6); // Actions
+        }
+        view.statsTableModel.fireTableDataChanged();
+    }
+
     private class GameManager extends SimpleBehaviour {
 
         @Override
@@ -59,15 +202,12 @@ public class MainAgent extends Agent {
             initAgentTypesList();
             view = new GUI();
             view.setVisible(true);
+            view.newGameButton.addActionListener(e -> startNewGame());
+            view.quitGameButton.addActionListener(e -> quitGame());
+            view.resetStatsButton.addActionListener(e -> resetStats());
 
             updatePlayers();
             view.appendLog("Application started", false);
-            try {
-                getContainerController().createNewAgent("randomAgent#1", "src.agents.RandomAgent", null).start();
-            } catch (StaleProxyException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
         }
 
         @Override

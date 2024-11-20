@@ -5,9 +5,6 @@ import javax.swing.event.ChangeListener;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
-import javax.swing.text.NumberFormatter;
-
-import com.formdev.flatlaf.util.SwingUtils;
 
 import src.jade_mvr.MainAgent.GameParametersStruct;
 
@@ -18,30 +15,29 @@ import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.net.URI;
 import java.awt.Desktop;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 
 public class GUI extends JFrame {
-    private JMenuBar menuBar;
-    private JMenu quitMenu;
-    private JPanel actionsPanel;
-    private JPanel configPanel;
-    private JPanel rightPanel;
-    private JPanel statsPanel;
-    private JPanel logPanel;
-    private JPanel knownAgentsPanel;
-    private JButton newGameButton;
-    private JButton quitGameButton;
-    private JButton resetStats;
-    private JButton stopButton;
-    private JButton continueButton;
-    private JButton playAllRoundsButton;
-    private JButton playXRoundsButton;
-    private JSpinner playXRoundsSpinner;
-    private JLabel playXRoundsLabel;
-    private JTextArea logTextArea;
-    private JCheckBox verboseCheckBox;
-    private DefaultTableModel statsTableModel;
+    public JMenuBar menuBar;
+    public JMenu quitMenu;
+    public JPanel actionsPanel;
+    public JPanel configPanel;
+    public JPanel rightPanel;
+    public JPanel statsPanel;
+    public JPanel logPanel;
+    public JPanel knownAgentsPanel;
+    public JButton newGameButton;
+    public JButton quitGameButton;
+    public JButton resetStatsButton;
+    public JButton stopButton;
+    public JButton continueButton;
+    public JButton playAllRoundsButton;
+    public JButton playXRoundsButton;
+    public JSpinner playXRoundsSpinner;
+    public JLabel playXRoundsLabel;
+    public JTextArea logTextArea;
+    public JCheckBox verboseCheckBox;
+    public DefaultTableModel statsTableModel;
 
     public GUI() {
         setTitle("JADE MVR");
@@ -92,76 +88,19 @@ public class GUI extends JFrame {
         setJMenuBar(menuBar);
     }
 
-    private void newGame() {
-        int totalAgents = 0;
-        for (Component component : knownAgentsPanel.getComponents()) {
-            if (component instanceof JPanel) {
-                JPanel agentPanel = (JPanel) component;
-                for (Component subComponent : agentPanel.getComponents()) {
-                    if (subComponent instanceof JSpinner) {
-                        totalAgents += (Integer) ((JSpinner) subComponent).getValue();
-                    }
-                }
-            }
-        }
-
-        if (totalAgents != MainAgent.getGameParameters().N) {
-            appendLog("The sum of agents (" + totalAgents + ") does not match the total number of players ("
-                    + MainAgent.getGameParameters().N + ").", false);
-            return;
-        }
-
-        // grafico
-        appendLog("New game started", false);
-
-        newGameButton.setEnabled(false);
-        quitGameButton.setEnabled(true);
-        resetStats.setEnabled(true);
-        stopButton.setEnabled(false);
-        continueButton.setEnabled(false);
-        playAllRoundsButton.setEnabled(true);
-        playXRoundsButton.setEnabled(true);
-        playXRoundsSpinner.setEnabled(true);
-
-        setPanelEnabled(configPanel, false);
-
-        // TODO: hacer new game
-        updateStatsTable(new Object[][] { { "Agent1", 0, 0, 0, 0, 0, "Actions", "Delete" },
-                { "Agent2", 0, 0, 0, 0, 0, "Actions", "Delete" } });
-    }
-
-    private void quitGame() {
-        // grafico
-        appendLog("Game finished", false);
-
-        newGameButton.setEnabled(true);
-        quitGameButton.setEnabled(false);
-        resetStats.setEnabled(false);
-        stopButton.setEnabled(false);
-        continueButton.setEnabled(false);
-        playAllRoundsButton.setEnabled(false);
-        playXRoundsButton.setEnabled(false);
-        playXRoundsSpinner.setEnabled(false);
-
-        setPanelEnabled(configPanel, true);
-
-        // TODO: reestablecer todo
-    }
-
     private void createActionsPanel() {
         actionsPanel = new JPanel();
         actionsPanel.setBorder(BorderFactory.createTitledBorder("Actions"));
         actionsPanel.setPreferredSize(new Dimension(1200, 60));
 
         newGameButton = new JButton("New Game");
-        newGameButton.addActionListener(e -> newGame());
+        // newGameButton.addActionListener(e -> newGame());
 
         quitGameButton = new JButton("Quit Game");
         quitGameButton.setEnabled(false);
-        quitGameButton.addActionListener(e -> quitGame());
 
-        resetStats = new JButton("Reset Stats");
-        resetStats.setEnabled(false);
+        resetStatsButton = new JButton("Reset Stats");
+        resetStatsButton.setEnabled(false);
 
         stopButton = new JButton("Stop");
         stopButton.setEnabled(false);
@@ -178,7 +117,7 @@ public class GUI extends JFrame {
 
         actionsPanel.add(newGameButton);
         actionsPanel.add(quitGameButton);
-        actionsPanel.add(resetStats);
+        actionsPanel.add(resetStatsButton);
         actionsPanel.add(stopButton);
         actionsPanel.add(continueButton);
         actionsPanel.add(playAllRoundsButton);
@@ -301,14 +240,14 @@ public class GUI extends JFrame {
         String[] columnNames = { "Name", "Wins", "Lose", "Draw", "Points", "Invested", "Last Actions", "Delete" };
         Object[][] data = {};
 
-        DefaultTableModel model = new DefaultTableModel(data, columnNames) {
+        statsTableModel  = new DefaultTableModel(data, columnNames) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return column == 8; // Only the "Delete" column is editable
             }
         };
 
-        JTable table = new JTable(model);
+        JTable table = new JTable(statsTableModel);
         table.getColumn("Delete").setCellRenderer(new ButtonRenderer());
         table.getColumn("Delete").setCellEditor(new ButtonEditor(new JCheckBox()));
 
@@ -322,7 +261,6 @@ public class GUI extends JFrame {
     }
 
     public void updateStatsTable(Object[][] data) {
-        // TODO: inicializar statsTableModel
         statsTableModel.setRowCount(0);
         for (Object[] row : data) {
             statsTableModel.addRow(row);
