@@ -16,11 +16,12 @@ public class RandomAgent extends Agent {
     private State state;
     private AID mainAgent;
     private int myId, opponentId;
-    private int N, S, R;
+    private int N, R;
+    private float S;
     private ACLMessage msg;
 
     protected void setup() {
-        state = State.s0NoConfig;
+        state = State.waitConfig;
 
         // Register in the yellow pages as a player
         DFAgentDescription dfd = new DFAgentDescription();
@@ -52,120 +53,125 @@ public class RandomAgent extends Agent {
     }
 
     private enum State {
-        s0NoConfig, s1AwaitingGame, s2Round, s3AwaitingResult
+        waitConfig, waitGame, waitAction, waitResults, waitAccounting
+    }
+
+    private String getRandomAction() {
+        return new Random().nextBoolean() ? "C" : "D";
+    }
+
+    private void printColored(String text) {
+        if (myId % 2 == 0) {
+            System.out.println("\u001B[31m" + text + "\u001B[0m"); // Red color for even IDs
+        } else {
+            System.out.println("\u001B[32m" + text + "\u001B[0m"); // Green color for odd IDs
+        }
     }
 
     private class Play extends CyclicBehaviour {
-        Random random = new Random(1000);
-
         @Override
         public void action() {
-            // System.out.println(getAID().getName() + ":" + state.name());
             msg = blockingReceive();
             if (msg != null) {
-                System.out.println(
-                        getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName()); // DELETEME
+                printColored(
+                        getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName() + "\n\t State: " + state); // DELETEME
 
                 switch (state) {
-                    case s0NoConfig:
-                        // If INFORM Id#_#_,_,_,_ PROCESS SETUP --> go to state 1
+                    case waitConfig:
+                        // If INFORM Id#_#_,_,_ PROCESS SETUP --> go to state 1
                         // Else ERROR
-                        System.out.println("AAAAAAAAAAAAAAAAA ---- " + msg.getContent());
                         if (msg.getContent().startsWith("Id#")) {
-                            boolean parametersUpdated = false;
                             try {
-                                parametersUpdated = validateSetupMessage(msg);
+                                if (validateAndSetParameters(msg)) {
+                                    state = State.waitGame;
+                                }
                             } catch (NumberFormatException e) {
-                                System.out.println(getAID().getName() + ":" + state.name() + " - Bad message");
+                                printColored(getAID().getName() + ":" + state.name() + " - Bad message");
                             }
-                            if (parametersUpdated)
-                                state = State.s1AwaitingGame;
+                        } else {
+                            printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
+                        }
+                        break;
+                    case waitGame:
+                        // If INFORM NewGame ----> waitAction
+                        // If REQUEST RoundOver -> waitAccounting
+                        // If INFORM GameOver ---> end the program
+                        if (msg.getPerformative() == ACLMessage.INFORM && msg.getContent().startsWith("NewGame#")) {
+                            if (validateNewGame(msg.getContent())) {
+                                state = State.waitAction;
+                            } else {
+                                printColored(getAID().getName() + ":" + state.name() + " - Bad message");
+                            }
+                        } else if (msg.getPerformative() == ACLMessage.REQUEST && msg.getContent().startsWith("RoundOver")) {
+                            state = State.waitAccounting;
+                        } else if (msg.getPerformative() == ACLMessage.INFORM && msg.getContent().startsWith("GameOver")) {
+                            takeDown();
+                        } else {
+                            printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
+                        }
+                        break;
 
-                        } else {
-                            System.out.println(getAID().getName() + ":" + state.name() + " - Unexpected message");
-                        }
-                        break;
-                    case s1AwaitingGame:
-                        // If INFORM NEWGAME#_,_ PROCESS NEWGAME --> go to state 2
-                        // If INFORM Id#_#_,_,_,_ PROCESS SETUP --> stay at s1
+                    case waitAction:
+                        // If REQUEST ACTION --> waitResults
                         // Else ERROR
-                        // TODO I probably should check if the new game message comes from the main
-                        // agent who sent the parameters
-                        if (msg.getPerformative() == ACLMessage.INFORM) {
-                            if (msg.getContent().startsWith("Id#")) { // Game settings updated
-                                try {
-                                    validateSetupMessage(msg);
-                                } catch (NumberFormatException e) {
-                                    System.out.println(getAID().getName() + ":" + state.name() + " - Bad message");
-                                }
-                            } else if (msg.getContent().startsWith("NewGame#")) {
-                                boolean gameStarted = false;
-                                try {
-                                    gameStarted = validateNewGame(msg.getContent());
-                                } catch (NumberFormatException e) {
-                                    System.out.println(getAID().getName() + ":" + state.name() + " - Bad message");
-                                }
-                                if (gameStarted)
-                                    state = State.s2Round;
-                            }
-                        } else {
-                            System.out.println(getAID().getName() + ":" + state.name() + " - Unexpected message");
-                        }
-                        break;
-                    case s2Round:
-                        // If REQUEST POSITION --> INFORM POSITION --> go to state 3
-                        // If INFORM CHANGED stay at state 2
-                        // If INFORM ENDGAME go to state 1
-                        // Else error
-                        if (msg.getPerformative() == ACLMessage.REQUEST /* && msg.getContent().startsWith("Position") */) {
+
+                        if (msg.getPerformative() == ACLMessage.REQUEST && msg.getContent().startsWith("Action")) {
                             ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
                             msg.addReceiver(mainAgent);
-                            msg.setContent("Position#" + random.nextInt(S));
-                            System.out.println(getAID().getName() + " sent " + msg.getContent());
+                            msg.setContent("Action#" + getRandomAction());
+                            printColored(getAID().getName() + " sent " + msg.getContent());
                             send(msg);
-                            state = State.s3AwaitingResult;
-                        } else if (msg.getPerformative() == ACLMessage.INFORM
-                                && msg.getContent().startsWith("Changed#")) {
-                            // Process changed message, in this case nothing
-                        } else if (msg.getPerformative() == ACLMessage.INFORM
-                                && msg.getContent().startsWith("EndGame")) {
-                            state = State.s1AwaitingGame;
+                            state = State.waitResults;
                         } else {
-                            System.out.println(getAID().getName() + ":" + state.name() + " - Unexpected message:"
-                                    + msg.getContent());
+                            printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
+                        }
+
+                        break;
+                    case waitResults:
+                        // If INFORM RESULTS --> waitGame
+                        // Else ERROR
+
+                        if (msg.getPerformative() == ACLMessage.INFORM && msg.getContent().startsWith("Results#")) {
+                            state = State.waitGame;
+                        } else {
+                            printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
                         }
                         break;
-                    case s3AwaitingResult:
-                        // If INFORM RESULTS --> go to state 2
-                        // Else error
-                        if (msg.getPerformative() == ACLMessage.INFORM && msg.getContent().startsWith("Results#")) {
-                            // Process results
-                            state = State.s2Round;
+                    case waitAccounting:
+                        // If INFORM Accounting --> waitGame
+                        // Else ERROR
+
+                        if (msg.getPerformative() == ACLMessage.INFORM && msg.getContent().startsWith("Accounting#")) {
+                            ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
+                            accountingMsg.addReceiver(mainAgent);
+                            String action = new Random().nextBoolean() ? "Buy" : "Sell";
+                            accountingMsg.setContent(action + " 1 asset");
+                            printColored(getAID().getName() + " sent " + accountingMsg.getContent());
+                            send(accountingMsg);
+                            state = State.waitGame;
                         } else {
-                            System.out.println(getAID().getName() + ":" + state.name() + " - Unexpected message");
+                            printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
                         }
                         break;
                 }
+                printColored(getAID().getName() + " is now in state " + state);
             }
         }
 
-        private boolean validateSetupMessage(ACLMessage msg) throws NumberFormatException {
-            int tN, tS, tR, tMyId;
-            String msgContent = msg.getContent();
-
-            String[] contentSplit = msgContent.split("#");
-            if (contentSplit.length != 3)
+        // Id#[ID]#[N],[R],[S]
+        private boolean validateAndSetParameters(ACLMessage msg) throws NumberFormatException {
+            String[] parts = msg.getContent().split("#");
+            if (parts.length != 3) {
                 return false;
-            if (!contentSplit[0].equals("Id"))
+            }
+            String[] params = parts[2].split(",");
+            if (params.length != 3) {
                 return false;
-            tMyId = Integer.parseInt(contentSplit[1]);
-
-            String[] parametersSplit = contentSplit[2].split(",");
-            if (parametersSplit.length != 5)
-                return false;
-            tN = Integer.parseInt(parametersSplit[0]);
-            tS = Integer.parseInt(parametersSplit[1]);
-            tR = Integer.parseInt(parametersSplit[2]);
+            }
+            int tMyId = Integer.parseInt(parts[1]);
+            int tN = Integer.parseInt(params[0]);
+            int tR = Integer.parseInt(params[1]);
+            float tS = Float.parseFloat(params[2]);
 
             // At this point everything should be fine, updating class variables
             mainAgent = msg.getSender();
@@ -176,29 +182,19 @@ public class RandomAgent extends Agent {
             return true;
         }
 
-        /**
-         * Processes the contents of the New Game message
-         * 
-         * @param msgContent Content of the message
-         * @return true if the message is valid
-         */
+        // NewGame#[ID0]#[ID1]
         public boolean validateNewGame(String msgContent) {
-            int msgId0, msgId1;
-            String[] contentSplit = msgContent.split("#");
-            if (contentSplit.length != 2)
+            String[] parts = msgContent.split("#");
+            if (parts.length != 3) {
                 return false;
-            if (!contentSplit[0].equals("NewGame"))
-                return false;
-            String[] idSplit = contentSplit[1].split(",");
-            if (idSplit.length != 2)
-                return false;
-            msgId0 = Integer.parseInt(idSplit[0]);
-            msgId1 = Integer.parseInt(idSplit[1]);
-            if (myId == msgId0) {
-                opponentId = msgId1;
+            }
+            int id1 = Integer.parseInt(parts[1]);
+            int id2 = Integer.parseInt(parts[2]);
+            if (id1 == myId) {
+                opponentId = id2;
                 return true;
-            } else if (myId == msgId1) {
-                opponentId = msgId0;
+            } else if (id2 == myId) {
+                opponentId = id1;
                 return true;
             }
             return false;

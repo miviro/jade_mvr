@@ -10,15 +10,20 @@ import jade.domain.FIPAException;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.lang.acl.ACLMessage;
+import jade.lang.acl.MessageTemplate;
+import jade.util.leap.Map;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
+import javax.swing.SwingUtilities;
 
 import java.awt.Component;
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 
 public class MainAgent extends Agent {
     private static GUI view;
@@ -26,6 +31,11 @@ public class MainAgent extends Agent {
     private static boolean verbose = false;
     private static ArrayList<String> agentTypesList = new ArrayList<String>();
     private static ArrayList<PlayerInformation> playerAgents = new ArrayList<PlayerInformation>();
+    private int currentRound = 0;
+
+    private float getIndexValue() {
+        return (float) 10.00;
+    }
 
     @Override
     protected void setup() {
@@ -60,6 +70,7 @@ public class MainAgent extends Agent {
     }
 
     private void startNewGame() {
+        currentRound = 0;
         int totalAgents = getTotalAgents();
 
         if (totalAgents != MainAgent.getGameParameters().N) {
@@ -84,57 +95,227 @@ public class MainAgent extends Agent {
         // Añadir jugadores a la tabla de estadísticas
         createPlayersAndAddToTable();
         sendConfigToPlayers();
-        // for (int i = 0; i < MainAgent.getGameParameters().R; i++) {
-        playRound();
-        // }
+        for (int i = 0; i < MainAgent.getGameParameters().R; i++) {
+            playRound();
+            processRoundOver();
+        }
+        processGameOver();
     }
 
-    private void playRound() {
-        view.appendLog("Playing round", false);
-        for (int i = 0; i < playerAgents.size(); i++) {
-            for (int j = i + 1; j < playerAgents.size(); j++) {
-                playGame(playerAgents.get(i), playerAgents.get(j));
+    private void processGameOver() {
+        for (PlayerInformation player : playerAgents) {
+            float assetsValue = player.getAssets() * getIndexValue();
+            float totalPayoff = player.getMoney() + assetsValue;
+            float fee = assetsValue * ((float) gameParameters.S / 100);
+            totalPayoff -= fee;
+            player.setMoney(totalPayoff);
+
+            ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+            msg.setContent("GameOver#" + player.id + "#" + totalPayoff);
+            msg.addReceiver(player.aid);
+            send(msg);
+        }
+    }
+
+    private void processRoundOver() {
+        // SEND REQUEST RoundOver#[player id]#[total player round payoff]#[total player round money adjusted for inflation]#[inflation rate, decimal]#[total player owned assets]#[asset individual price] to all players
+        for (PlayerInformation player : playerAgents) {
+            ACLMessage roundOverMsg = new ACLMessage(ACLMessage.REQUEST);
+            float totalRoundPayoff = player.getMoney();
+            float totalRoundMoney = player.getMoney() * (1 + (float) gameParameters.I / 100);
+            float totalRoundAssets = player.getAssets();
+            float assetPrice = totalRoundAssets > 0 ? totalRoundMoney / totalRoundAssets : 0;
+            String content = "RoundOver#" + player.id + "#" + totalRoundPayoff + "#" + totalRoundMoney + "#"
+                    + (float) gameParameters.I / 100 + "#" + totalRoundAssets + "#" + assetPrice;
+            roundOverMsg.setContent(content);
+            roundOverMsg.addReceiver(player.aid);
+            send(roundOverMsg);
+        }
+
+        // Receive buy/sell orders from players
+        // TODO hacer que random agent compre y venda
+        java.util.Map<AID, ACLMessage> receivedMessages = new HashMap<>();
+        
+        while (receivedMessages.size() < playerAgents.size()) {
+            ACLMessage msg = blockingReceive();
+            if (msg != null && msg.getPerformative() == ACLMessage.INFORM) {
+                AID sender = msg.getSender();
+                if (!receivedMessages.containsKey(sender)) {
+                    receivedMessages.put(sender, msg);
+                    String content = msg.getContent();
+                    String[] parts = content.split("#");
+                    if (parts.length == 2) {
+                        String action = parts[0];
+                        float amount;
+                        try {
+                            amount = Float.parseFloat(parts[1]);
+                            PlayerInformation player = null;
+                            for (PlayerInformation p : playerAgents) {
+                                if (p.aid.equals(sender)) {
+                                    player = p;
+                                    break;
+                                }
+                            }
+                            if (player != null) {
+                                if ("Buy".equalsIgnoreCase(action)) {
+                                    if (player.getMoney() >= amount) {
+                                        player.setMoney(player.getMoney() - amount);
+                                        player.setAssets(player.getAssets() + amount / getIndexValue());
+                                        view.appendLog("Player " + player.id + " bought assets worth " + amount, false);
+                                    } else {
+                                        view.appendLog("Player " + player.id + " tried to buy more than they have.", true);
+                                    }
+                                } else if ("Sell".equalsIgnoreCase(action)) {
+                                    if (player.getAssets() >= amount) {
+                                        float assetValue = amount * getIndexValue();
+                                        player.setAssets(player.getAssets() - amount);
+                                        player.setMoney(player.getMoney() + assetValue);
+                                        view.appendLog("Player " + player.id + " sold assets worth " + assetValue, false);
+                                    } else {
+                                        view.appendLog("Player " + player.id + " tried to sell more than they have.", true);
+                                    }
+                                } else {
+                                    view.appendLog("Invalid action '" + action + "' from player " + player.id, true);
+                                }
+                            } else {
+                                view.appendLog("Player not found for message from " + sender.getLocalName(), true);
+                            }
+                        } catch (NumberFormatException e) {
+                            view.appendLog("Invalid amount from player " + sender.getLocalName(), true);
+                        }
+                    } else {
+                        view.appendLog("Invalid message format from player " + sender.getLocalName(), true);
+                    }
+                } else {
+                    view.appendLog("Duplicate message from player " + sender.getLocalName(), true);
+                }
             }
         }
     }
 
-    private void playGame(PlayerInformation player1, PlayerInformation player2) {
-        // Assuming player1.id < player2.id
-        ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-        msg.addReceiver(player1.aid);
-        msg.addReceiver(player2.aid);
-        msg.setContent("NewGame#" + player1.id + "#" + player2.id);
-        send(msg);
+    private void playRound() {
+        for (int i = 0; i < playerAgents.size(); i++) {
+            for (int j = i + 1; j < playerAgents.size(); j++) {
+                PlayerInformation player1 = playerAgents.get(i);
+                PlayerInformation player2 = playerAgents.get(j);
 
-        int pos1, pos2;
+                GameInfo gameInfo = playGame(player1, player2);
 
-        msg = new ACLMessage(ACLMessage.REQUEST);
-        msg.setContent("Action");
-        msg.addReceiver(player1.aid);
-        send(msg);
+                if (gameInfo.player1Reward > gameInfo.player2Reward) {
+                    player1.setWins(player1.getWins() + 1);
+                    player2.setLosses(player2.getLosses() + 1);
+                } else if (gameInfo.player1Reward < gameInfo.player2Reward) {
+                    player1.setLosses(player1.getLosses() + 1);
+                    player2.setWins(player2.getWins() + 1);
+                } else {
+                    player1.setDraws(player1.getDraws() + 1);
+                    player2.setDraws(player2.getDraws() + 1);
+                }
 
-        view.appendLog("Main Waiting for movement", true);
-        ACLMessage move1 = blockingReceive();
-        view.appendLog("Main Received " + move1.getContent() + " from " + move1.getSender().getName(), true);
-        pos1 = Integer.parseInt(move1.getContent().split("#")[1]);
+                player1.setMoney(player1.getMoney() + gameInfo.player1Reward);
+                player2.setMoney(player2.getMoney() + gameInfo.player2Reward);
 
-        msg = new ACLMessage(ACLMessage.REQUEST);
-        msg.setContent("Action");
-        msg.addReceiver(player2.aid);
-        send(msg);
+                player1.addLastAction(gameInfo.player1Action);
+                player2.addLastAction(gameInfo.player2Action);
+            }
+        }
+        // EVERY ROUND: Update the table with new values
+        for (int k = 0; k < view.statsTableModel.getRowCount(); k++) {
+            PlayerInformation player = playerAgents.get(k);
+            view.statsTableModel.setValueAt(player.getWins(), k, 1); // Wins
+            view.statsTableModel.setValueAt(player.getLosses(), k, 2); // Losses
+            view.statsTableModel.setValueAt(player.getDraws(), k, 3); // Draws
+            view.statsTableModel.setValueAt(player.getMoney(), k, 4); // Money
+            view.statsTableModel.setValueAt(player.getLastActions(), k, 6); // LAST ACTIONS
+        }
 
-        view.appendLog("Main Waiting for movement", true);
-        ACLMessage move2 = blockingReceive();
-        view.appendLog("Main Received " + move1.getContent() + " from " + move1.getSender().getName(), true);
-        pos2 = Integer.parseInt(move1.getContent().split("#")[1]);
+        // añadir 1 a currentRound, mostrar +1 para que empiece en 1
+        view.verboseLabel.setText("Round " + (currentRound++ + 1) + " / " + getGameParameters().R + ", current index value: " + getIndexValue());
 
-        msg = new ACLMessage(ACLMessage.INFORM);
-        msg.addReceiver(player1.aid);
-        msg.addReceiver(player2.aid);
-        msg.setContent("Results#1#1");
-        send(msg);
-        msg.setContent("EndGame");
-        send(msg);
+        view.statsTableModel.fireTableDataChanged();
+    }
+
+    // TODO: return info about the game
+    private GameInfo playGame(PlayerInformation player1, PlayerInformation player2) {
+        // Send INFORM NewGame#[player1.id]#[player2.id] to both players
+        ACLMessage newGameMsg = new ACLMessage(ACLMessage.INFORM);
+        newGameMsg.setContent("NewGame#" + player1.id + "#" + player2.id);
+        newGameMsg.addReceiver(player1.aid);
+        newGameMsg.addReceiver(player2.aid);
+        send(newGameMsg);
+
+        // Send REQUEST Action to both players
+        ACLMessage actionRequest = new ACLMessage(ACLMessage.REQUEST);
+        actionRequest.setContent("Action");
+        actionRequest.addReceiver(player1.aid);
+        actionRequest.addReceiver(player2.aid);
+        send(actionRequest);
+
+        // Wait for both players to send INFORM Action#[action]
+        String player1Action = null;
+        String player2Action = null;
+
+        while (player1Action == null || player2Action == null) {
+            ACLMessage msg = blockingReceive();
+            if (msg != null) {
+                String[] content = msg.getContent().split("#");
+                if (content[0].equals("Action") && content.length > 1) {
+                    String action = content[1];
+                    if (msg.getSender().equals(player1.aid)) {
+                        player1Action = action;
+                    } else if (msg.getSender().equals(player2.aid)) {
+                        player2Action = action;
+                    }
+                }
+            }
+        }
+
+        // Resolve game
+        int player1Reward = 0;
+        int player2Reward = 0;
+
+        // Example game logic
+        if (player1Action.equals("C") && player2Action.equals("C")) {
+            player1Reward = 2;
+            player2Reward = 2;
+        } else if (player1Action.equals("C") && player2Action.equals("D")) {
+            player1Reward = 0;
+            player2Reward = 4;
+        } else if (player1Action.equals("D") && player2Action.equals("C")) {
+            player1Reward = 4;
+            player2Reward = 0;
+        } else if (player1Action.equals("D") && player2Action.equals("D")) {
+            player1Reward = 0;
+            player2Reward = 0;
+        }
+
+        // Send INFORM
+        // Results#[player1.id],[player2.id]#[player1Action],[player2Action]#[player1Reward],[player2Reward]
+        ACLMessage resultsMsg = new ACLMessage(ACLMessage.INFORM);
+        resultsMsg.setContent("Results#" + player1.id + "," + player2.id + "#" + player1Action + "," + player2Action
+                + "#" + player1Reward + "," + player2Reward);
+        resultsMsg.addReceiver(player1.aid);
+        resultsMsg.addReceiver(player2.aid);
+        send(resultsMsg);
+        return new GameInfo(player1.id, player2.id, player1Action, player2Action, player1Reward, player2Reward);
+    }
+
+    private class GameInfo {
+        int player1Id;
+        int player2Id;
+        String player1Action;
+        String player2Action;
+        int player1Reward;
+        int player2Reward;
+
+        public GameInfo(int p1, int p2, String p1a, String p2a, int p1r, int p2r) {
+            player1Id = p1;
+            player2Id = p2;
+            player1Action = p1a;
+            player2Action = p2a;
+            player1Reward = p1r;
+            player2Reward = p2r;
+        }
     }
 
     private void sendConfigToPlayers() {
@@ -173,7 +354,7 @@ public class MainAgent extends Agent {
                         data[agentIndex][1] = 0; // Wins
                         data[agentIndex][2] = 0; // Lose
                         data[agentIndex][3] = 0; // Draw
-                        data[agentIndex][4] = 0; // Points
+                        data[agentIndex][4] = 0; // Money
                         data[agentIndex][5] = 0; // Invested
                         data[agentIndex][6] = ""; // Last Actions
                         data[agentIndex][7] = "Delete"; // Delete button
@@ -211,6 +392,7 @@ public class MainAgent extends Agent {
     }
 
     private void quitGame() {
+        currentRound = 0;
         // grafico
         view.appendLog("Game finished", false);
 
@@ -261,7 +443,7 @@ public class MainAgent extends Agent {
             view.statsTableModel.setValueAt(0, i, 1); // Wins
             view.statsTableModel.setValueAt(0, i, 2); // Losses
             view.statsTableModel.setValueAt(0, i, 3); // Draws
-            view.statsTableModel.setValueAt(0, i, 4); // Points
+            view.statsTableModel.setValueAt(0, i, 4); // Money
             view.statsTableModel.setValueAt(0, i, 5); // Invested
             view.statsTableModel.setValueAt("", i, 6); // Actions
         }
@@ -366,6 +548,70 @@ public class MainAgent extends Agent {
     public static class PlayerInformation {
         AID aid;
         int id;
+        private int wins;
+        private int losses;
+        private int draws;
+        private float money;
+        private float assets;
+        private String lastActions ="";
+
+        public String getLastActions() {
+            return lastActions;
+        }
+
+        public void resetLastActions() {
+            this.lastActions = "";
+
+        }
+
+        // Keep last 5 actions
+        public void addLastAction(String action) {
+            if (this.lastActions.length() >= 5) {
+                this.lastActions = this.lastActions.substring(1);
+            }
+            this.lastActions += action;
+        }
+
+        public int getWins() {
+
+            return wins;
+        }
+
+        public void setWins(int wins) {
+            this.wins = wins;
+        }
+
+        public int getLosses() {
+            return losses;
+        }
+
+        public void setLosses(int losses) {
+            this.losses = losses;
+        }
+
+        public int getDraws() {
+            return draws;
+        }
+
+        public void setDraws(int draws) {
+            this.draws = draws;
+        }
+
+        public float getMoney() {
+            return money;
+        }
+
+        public void setMoney(float money) {
+            this.money = (float) (Math.round(money * 100.0) / 100.0); // dos decimales
+        }
+
+        public float getAssets() {
+            return assets;
+        }
+
+        public void setAssets(float assets) {
+            this.assets = (float) (Math.round(assets * 100.0) / 100.0); // dos decimales
+        }
 
         public PlayerInformation(AID a, int i) {
             aid = a;

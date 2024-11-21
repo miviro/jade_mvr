@@ -35,6 +35,7 @@ public class GUI extends JFrame {
     public JButton playXRoundsButton;
     public JSpinner playXRoundsSpinner;
     public JLabel playXRoundsLabel;
+    public JLabel verboseLabel;
     public JTextArea logTextArea;
     public JCheckBox verboseCheckBox;
     public DefaultTableModel statsTableModel;
@@ -200,10 +201,10 @@ public class GUI extends JFrame {
         ChangeListener updateListener = e -> {
             try {
                 int n = (Integer) nSpinner.getValue();
-                int s = (Integer) sSpinner.getValue();
                 int r = (Integer) rSpinner.getValue();
+                int s = (Integer) sSpinner.getValue();
                 int i = (Integer) iSpinner.getValue();
-                MainAgent.setGameParameters(new GameParametersStruct(n, s, r, i));
+                MainAgent.setGameParameters(new GameParametersStruct(n, r, s, i));
                 // Update known agents panel
                 configPanel.remove(knownAgentsPanel);
                 knownAgentsPanel = createKnownAgentsPanel();
@@ -237,7 +238,7 @@ public class GUI extends JFrame {
     }
 
     private JPanel createStatsTablePanel() {
-        String[] columnNames = { "Name", "Wins", "Lose", "Draw", "Points", "Invested", "Last Actions", "Delete" };
+        String[] columnNames = { "Name", "Wins", "Lose", "Draw", "Money", "Assets", "Last Actions", "Delete" };
         Object[][] data = {};
 
         statsTableModel = new DefaultTableModel(data, columnNames) {
@@ -333,6 +334,9 @@ public class GUI extends JFrame {
         verboseCheckBox = new JCheckBox("Verbose");
         verboseCheckBox.addActionListener(e -> MainAgent.setVerbose(verboseCheckBox.isSelected()));
         titlePanel.add(verboseCheckBox);
+
+        verboseLabel = new JLabel("Round 0 / null, current index value: null");
+        titlePanel.add(verboseLabel);
 
         logPanel.add(titlePanel, BorderLayout.NORTH);
         logPanel.setPreferredSize(new Dimension(1200, 140));
