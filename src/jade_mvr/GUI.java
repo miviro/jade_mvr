@@ -183,7 +183,7 @@ public class GUI extends JFrame {
 
         // Retrieve current parameters
         GameParametersStruct params = MainAgent.getGameParameters();
-        // Create spinners with default values
+        // TODO: quitar I?
         JSpinner nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 1000, 1));
         JSpinner sSpinner = new JSpinner(new SpinnerNumberModel(params.S, 0, 100, 1));
         JSpinner rSpinner = new JSpinner(new SpinnerNumberModel(params.R, 1, 1000, 1));
@@ -240,7 +240,7 @@ public class GUI extends JFrame {
         String[] columnNames = { "Name", "Wins", "Lose", "Draw", "Points", "Invested", "Last Actions", "Delete" };
         Object[][] data = {};
 
-        statsTableModel  = new DefaultTableModel(data, columnNames) {
+        statsTableModel = new DefaultTableModel(data, columnNames) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return column == 8; // Only the "Delete" column is editable
