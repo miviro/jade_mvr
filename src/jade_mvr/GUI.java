@@ -2,7 +2,6 @@ package src.jade_mvr;
 
 import javax.swing.*;
 import javax.swing.event.ChangeListener;
-import javax.swing.event.HyperlinkEvent;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
 
@@ -63,29 +62,19 @@ public class GUI extends JFrame {
         quitMenu.add(confirmMenuItem);
 
         // About
-        // TODO: Reducir anchura de About
-        JMenuItem aboutMenuItem = new JMenuItem("About");
+        JMenuItem aboutMenuItem = new JMenuItem("Author: Miguel Vila Rodríguez - 2024 - https://github.com/miviro/jade_mvr");
         aboutMenuItem.addActionListener(actionEvent -> {
-            String message = "<html>Author: Miguel Vila Rodríguez<br>Date: 13-11-2024<br>" +
-                    "Website: <a href='https://miviro.es'>https://miviro.es</a><br>" +
-                    "GitHub: <a href='https://github.com/miviro/jade_mvr'>https://github.com/miviro/jade_mvr</a></html>";
-            JEditorPane editorPane = new JEditorPane("text/html", message);
-            editorPane.setEditable(false);
-            editorPane.setOpaque(false);
-            editorPane.addHyperlinkListener(e -> {
-                if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                    try {
-                        Desktop.getDesktop().browse(new URI(e.getURL().toString()));
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                    }
-                }
-            });
-            JOptionPane.showMessageDialog(this, editorPane, "About", JOptionPane.INFORMATION_MESSAGE);
+            try {
+                Desktop.getDesktop().browse(URI.create("https://github.com/miviro/jade_mvr"));
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         });
-
+        
         menuBar.add(quitMenu);
         menuBar.add(aboutMenuItem);
+        menuBar.add(Box.createHorizontalGlue());
+
         setJMenuBar(menuBar);
     }
 
@@ -104,7 +93,6 @@ public class GUI extends JFrame {
 
         stopButton = new JButton("Stop");
         stopButton.setEnabled(false);
-        // continueButton = new JButton("Continue"); // TODO controlar rondas
         // continueButton.setEnabled(false);
         playAllRoundsButton = new JButton("Play All Rounds");
         playAllRoundsButton.setEnabled(false);
@@ -295,8 +283,7 @@ public class GUI extends JFrame {
         @Override
         public Object getCellEditorValue() {
             if (isPushed) {
-                // Call the function to handle the delete action
-                handleDeleteAction();
+                appendLog("Delete button clicked", false);
             }
             isPushed = false;
             return label;
@@ -313,8 +300,7 @@ public class GUI extends JFrame {
             super.fireEditingStopped();
         }
 
-        private void handleDeleteAction() {
-            // Implement the delete action here
+        private void handleDeleteAgent() {
             appendLog("Delete button clicked", false);
         }
     }

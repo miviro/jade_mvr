@@ -32,6 +32,10 @@ public class MainAgent extends Agent {
     public static Object roundLock = new Object();
     private int currentRound = 0;
     private int stopAtRound = 0;
+    private int agendUniqueId = 0;
+
+    private Thread gameThread;
+    private volatile boolean gameRunning = false;
 
     private float getIndexValue(int currentRound) {
         return (float) 10.00;
@@ -75,6 +79,7 @@ public class MainAgent extends Agent {
 
     private void startNewGame() {
         currentRound = 0;
+        stopAtRound = 0;
         int totalAgents = getTotalAgents();
 
         if (totalAgents != MainAgent.getGameParameters().N) {
@@ -98,61 +103,87 @@ public class MainAgent extends Agent {
         // Añadir jugadores a la tabla de estadísticas
         createPlayersAndAddToTable();
         sendConfigToPlayers();
-        // TODO: ejecuta todas las rondas sin parar
-        // TODO: cambiar enabled botones
-        new Thread(() -> {
-            for (int i = 0; i < MainAgent.getGameParameters().R; i++) {
-                // Check if we need to pause
-                synchronized (MainAgent.roundLock) {
-                    if (stopAtRound <= currentRound) {
-                        // We have executed all requested rounds
-                        try {
-                            SwingUtilities.invokeAndWait(() -> {
-                                view.newGameButton.setEnabled(false);
-                                view.quitGameButton.setEnabled(true);
-                                view.resetStatsButton.setEnabled(true);
-                                view.stopButton.setEnabled(false);
-                                view.playAllRoundsButton.setEnabled(true);
-                                view.playXRoundsButton.setEnabled(true);
-                                view.playXRoundsSpinner.setEnabled(true);
-                            });
-                        } catch (InvocationTargetException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        } catch (InterruptedException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        }
 
-                        try {
-                            roundLock.wait(); // Wait without blocking the GUI thread
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            SwingUtilities.invokeLater(() -> {
-                                view.appendLog("Thread interrupted: " + e.getMessage(), true);
-                            });
+        gameRunning = true;
+
+        gameThread = new Thread(() -> {
+            while (gameRunning) {
+
+                for (int i = 0; i < MainAgent.getGameParameters().R; i++) {
+                    // Check if we need to pause
+                    synchronized (MainAgent.roundLock) {
+                        // We have executed all requested rounds
+                        if (stopAtRound <= currentRound) {
+                            try {
+                                SwingUtilities.invokeAndWait(() -> {
+                                    view.newGameButton.setEnabled(false);
+                                    view.quitGameButton.setEnabled(true);
+                                    view.resetStatsButton.setEnabled(true);
+                                    view.stopButton.setEnabled(false);
+                                    view.playAllRoundsButton.setEnabled(true);
+                                    view.playXRoundsButton.setEnabled(true);
+                                    view.playXRoundsSpinner.setEnabled(true);
+                                });
+                            } catch (InvocationTargetException e) {
+                                e.printStackTrace();
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                            try {
+                                roundLock.wait(); // Wait without blocking the GUI thread
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                SwingUtilities.invokeLater(() -> {
+                                    view.appendLog("Thread interrupted: " + e.getMessage(), true);
+                                });
+                            }
                         }
                     }
+                    // si estamos aqui, tenemos rondas por ejecutar
+                    view.newGameButton.setEnabled(false);
+                    view.quitGameButton.setEnabled(false);
+                    view.resetStatsButton.setEnabled(false);
+                    view.stopButton.setEnabled(true);
+                    // view.continueButton.setEnabled(false);
+                    view.playAllRoundsButton.setEnabled(false);
+                    view.playXRoundsButton.setEnabled(false);
+                    view.playXRoundsSpinner.setEnabled(false);
+
+                    playRound();
+                    processRoundOver();
                 }
-                // si estamos aqui, tenemos rondas por ejecutar
+                processGameOver();
+
+                gameRunning = false;
+
+                // si estamos aqui, hemos terminado todas las rondas
                 view.newGameButton.setEnabled(false);
-                view.quitGameButton.setEnabled(false);
-                view.resetStatsButton.setEnabled(false);
-                view.stopButton.setEnabled(true);
+                view.quitGameButton.setEnabled(true);
+                view.resetStatsButton.setEnabled(true);
+                view.stopButton.setEnabled(false);
                 // view.continueButton.setEnabled(false);
                 view.playAllRoundsButton.setEnabled(false);
                 view.playXRoundsButton.setEnabled(false);
                 view.playXRoundsSpinner.setEnabled(false);
 
-                playRound();
-                processRoundOver();
+                if (Thread.currentThread().isInterrupted()) {
+                    break;
+                }
             }
-            processGameOver();
-        }).start();
+        });
+        gameThread.start();
     }
 
     private void playXRounds(int rounds) {
-        setStopAtRound(currentRound + rounds);
+        if (rounds <= 0) {
+            view.appendLog("Invalid number of rounds: " + rounds, true);
+            return;
+        }
+        if (currentRound + rounds > getGameParameters().R) {
+            setStopAtRound(getGameParameters().R);
+        } else {
+            setStopAtRound(currentRound + rounds);
+        }
     }
 
     private void setStopAtRound(int round) {
@@ -335,9 +366,8 @@ public class MainAgent extends Agent {
         // Wait for both players to send INFORM Action#[action]
         String player1Action = null;
         String player2Action = null;
-
         while (player1Action == null || player2Action == null) {
-            ACLMessage msg = blockingReceive();
+            ACLMessage msg = blockingReceive(); // TODO: da error pero funciona
             if (msg != null) {
                 String[] content = msg.getContent().split("#");
                 if (content[0].equals("Action") && content.length > 1) {
@@ -379,6 +409,7 @@ public class MainAgent extends Agent {
         resultsMsg.addReceiver(player2.aid);
         send(resultsMsg);
         return new GameInfo(player1Action, player2Action, player1Reward, player2Reward);
+
     }
 
     private class GameInfo {
@@ -428,7 +459,7 @@ public class MainAgent extends Agent {
 
                 if (agentType != null && agentCount > 0) {
                     for (int i = 0; i < agentCount; i++) {
-                        data[agentIndex][0] = agentType + agentIndex;
+                        data[agentIndex][0] = agentType + agentIndex + agendUniqueId;
                         data[agentIndex][1] = 0; // Wins
                         data[agentIndex][2] = 0; // Lose
                         data[agentIndex][3] = 0; // Draw
@@ -439,13 +470,20 @@ public class MainAgent extends Agent {
 
                         try {
                             getContainerController()
-                                    .createNewAgent(agentType + agentIndex, "src.agents." + agentType, null).start();
+                                    .createNewAgent(agentType + agentIndex + agendUniqueId, "src.agents." + agentType,
+                                            null)
+                                    .start();
+                            // unique ID para evitar colisiones en los mensajes mandados a agentes que se
+                            // borran antes de tiempo
+
+                            playerAgents.add(
+                                    new PlayerInformation(
+                                            new AID(agentType + agentIndex + agendUniqueId++, AID.ISLOCALNAME),
+                                            agentIndex));
+                            agentIndex++;
                         } catch (Exception e) {
                             view.appendLog("Could not create agent " + agentType + ": " + e.getMessage(), true);
                         }
-                        playerAgents.add(
-                                new PlayerInformation(new AID(agentType + agentIndex, AID.ISLOCALNAME), agentIndex));
-                        agentIndex++;
                     }
                 }
             }
@@ -469,8 +507,43 @@ public class MainAgent extends Agent {
         return totalAgents;
     }
 
+    public void deleteAgent(String agentName) {
+        try {
+            getContainerController().getAgent(agentName).kill();
+        } catch (StaleProxyException e) {
+            view.appendLog("Could not kill agent " + agentName + ": " + e.getMessage(), true);
+        } catch (ControllerException e) {
+            view.appendLog("Could not kill agent " + agentName + ": " + e.getMessage(), true);
+            e.printStackTrace();
+        }
+        playerAgents.removeIf(player -> player.aid.getLocalName().equals(agentName));
+        // Rebuild the table with the updated playerAgents list
+        Object[][] data = new Object[playerAgents.size()][8];
+        for (int i = 0; i < playerAgents.size(); i++) {
+            PlayerInformation player = playerAgents.get(i);
+            data[i][0] = player.aid.getLocalName();
+            data[i][1] = player.getWins();
+            data[i][2] = player.getLosses();
+            data[i][3] = player.getDraws();
+            data[i][4] = player.getMoney();
+            data[i][5] = player.getAssets();
+            data[i][6] = player.getLastActions();
+            data[i][7] = "Delete";
+        }
+        view.updateStatsTable(data);
+    }
+
     private void quitGame() {
+        processGameOver(); // para que no peten los mensajes
+        gameRunning = false;
+
+        if (gameThread != null && gameThread.isAlive()) {
+            gameThread.interrupt();
+            gameThread = null;
+        }
+
         currentRound = 0;
+        stopAtRound = 0;
         // grafico
         view.appendLog("Game finished", false);
 
@@ -482,6 +555,7 @@ public class MainAgent extends Agent {
         view.playAllRoundsButton.setEnabled(false);
         view.playXRoundsButton.setEnabled(false);
         view.playXRoundsSpinner.setEnabled(false);
+        view.verboseLabel.setText("Round 0 / null, index value: nulll , inflation rate: null");
 
         view.setPanelEnabled(view.configPanel, true);
 
@@ -510,10 +584,10 @@ public class MainAgent extends Agent {
             view.appendLog(fe.getMessage(), true);
         }
         playerAgents.clear();
+        view.stopButton.setEnabled(false); // por algun motivo se queda activado, desactivar otra vez
     }
 
     private void resetStats() {
-        // TODO: cambiar stats en arraylist no solo en la tabla
         // grafico
         view.appendLog("Stats reset", false);
 
@@ -527,6 +601,16 @@ public class MainAgent extends Agent {
             view.statsTableModel.setValueAt("", i, 6); // Actions
         }
         view.statsTableModel.fireTableDataChanged();
+
+        // Reset stats in the playerAgents list
+        for (PlayerInformation player : playerAgents) {
+            player.setWins(0);
+            player.setLosses(0);
+            player.setDraws(0);
+            player.setMoney(0);
+            player.setAssets(0);
+            player.resetLastActions();
+        }
     }
 
     private class GameManager extends SimpleBehaviour {

@@ -119,7 +119,6 @@ public class RandomAgent extends Agent {
                         } else if (msg.getPerformative() == ACLMessage.INFORM
                                 && msg.getContent().startsWith("GameOver")) {
                             System.out.println("Game Over " + getAID().getName());
-                            doWait();
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
                         }
@@ -159,6 +158,7 @@ public class RandomAgent extends Agent {
                             state = State.waitGame;
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
+
                         }
                         break;
                 }
