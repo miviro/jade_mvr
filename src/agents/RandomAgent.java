@@ -77,7 +77,8 @@ public class RandomAgent extends Agent {
             msg = blockingReceive();
             if (msg != null) {
                 printColored(
-                        getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName() + "\n\t State: " + state); // DELETEME
+                        getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName()
+                                + "\n\t State: " + state); // DELETEME
 
                 switch (state) {
                     case waitConfig:
@@ -105,17 +106,20 @@ public class RandomAgent extends Agent {
                             } else {
                                 printColored(getAID().getName() + ":" + state.name() + " - Bad message");
                             }
-                        } else if (msg.getPerformative() == ACLMessage.REQUEST && msg.getContent().startsWith("RoundOver")) {
+                        } else if (msg.getPerformative() == ACLMessage.REQUEST
+                                && msg.getContent().startsWith("RoundOver")) {
                             ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
                             accountingMsg.addReceiver(mainAgent);
                             String action = new Random().nextBoolean() ? "Buy" : "Sell";
-                            accountingMsg.setContent(action + "#" + 1); // TODO: raro: hay assets decimales cuando deberian ser enteros
+                            accountingMsg.setContent(action + "#" + 1);
                             printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                             send(accountingMsg);
 
                             state = State.waitAccounting;
-                        } else if (msg.getPerformative() == ACLMessage.INFORM && msg.getContent().startsWith("GameOver")) {
+                        } else if (msg.getPerformative() == ACLMessage.INFORM
+                                && msg.getContent().startsWith("GameOver")) {
                             System.out.println("Game Over " + getAID().getName());
+                            doWait();
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
                         }

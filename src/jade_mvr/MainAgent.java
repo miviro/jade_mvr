@@ -29,10 +29,10 @@ public class MainAgent extends Agent {
     private static ArrayList<PlayerInformation> playerAgents = new ArrayList<PlayerInformation>();
     private int currentRound = 0;
 
-
     private float getIndexValue(int currentRound) {
         return (float) 10.00;
     }
+
     private float getInflationRate(int currentRound) {
         return (float) 1 / 100;
     }
@@ -98,7 +98,7 @@ public class MainAgent extends Agent {
         for (int i = 0; i < MainAgent.getGameParameters().R; i++) {
             playRound();
             processRoundOver();
-                }
+        }
         processGameOver();
     }
 
@@ -118,7 +118,9 @@ public class MainAgent extends Agent {
     }
 
     private void processRoundOver() {
-        // SEND REQUEST RoundOver#[player id]#[total player round payoff]#[total player round money adjusted for inflation]#[inflation rate, decimal]#[total player owned assets]#[asset individual price] to all players
+        // SEND REQUEST RoundOver#[player id]#[total player round payoff]#[total player
+        // round money adjusted for inflation]#[inflation rate, decimal]#[total player
+        // owned assets]#[asset individual price] to all players
         for (PlayerInformation player : playerAgents) {
             ACLMessage roundOverMsg = new ACLMessage(ACLMessage.REQUEST);
             float totalRoundPayoff = player.getMoney();
@@ -132,10 +134,9 @@ public class MainAgent extends Agent {
             send(roundOverMsg);
         }
 
-
         // Receive buy/sell orders from players
         java.util.Map<AID, ACLMessage> receivedMessages = new HashMap<>();
-        
+
         while (receivedMessages.size() < playerAgents.size()) {
             ACLMessage msg = blockingReceive();
             if (msg != null && msg.getPerformative() == ACLMessage.INFORM) {
@@ -159,12 +160,13 @@ public class MainAgent extends Agent {
                             }
                             if (player != null) {
                                 if ("Buy".equalsIgnoreCase(action)) {
-                                    if (player.getMoney() >= amount) {
-                                        player.setMoney(player.getMoney() - amount);
-                                        player.setAssets(player.getAssets() + amount / getIndexValue(currentRound));
-                                        view.appendLog("Player " + player.id + " bought " + amount + " assets " , false);
+                                    if (player.getMoney() >= (amount * getIndexValue(currentRound))) {
+                                        player.setMoney(player.getMoney() - (amount * getIndexValue(currentRound)));
+                                        player.setAssets(player.getAssets() + amount);
+                                        view.appendLog("Player " + player.id + " bought " + amount + " assets ", true);
                                     } else {
-                                        view.appendLog("Player " + player.id + " tried to buy more than they have.", true);
+                                        view.appendLog("Player " + player.id + " tried to buy more than they have.",
+                                                false);
                                     }
                                 } else if ("Sell".equalsIgnoreCase(action)) {
                                     if (player.getAssets() >= amount) {
@@ -172,9 +174,11 @@ public class MainAgent extends Agent {
                                         float fee = assetValue * (1 - (float) getGameParameters().S);
                                         player.setAssets(player.getAssets() - amount);
                                         player.setMoney(player.getMoney() + assetValue - fee);
-                                        view.appendLog("Player " + player.id + " sold assets worth " + assetValue, false);
+                                        view.appendLog("Player " + player.id + " sold assets worth " + assetValue,
+                                                true);
                                     } else {
-                                        view.appendLog("Player " + player.id + " tried to sell more than they have.", true);
+                                        view.appendLog("Player " + player.id + " tried to sell more than they have.",
+                                                false);
                                     }
                                 } else {
                                     view.appendLog("Invalid action '" + action + "' from player " + player.id, true);
@@ -242,7 +246,8 @@ public class MainAgent extends Agent {
         }
 
         // añadir 1 a currentRound, mostrar +1 para que empiece en 1
-        view.verboseLabel.setText("Round " + (currentRound++ + 1) + " / " + getGameParameters().R + ", current index value: " + getIndexValue(currentRound));
+        view.verboseLabel.setText("Round " + (currentRound++ + 1) + " / " + getGameParameters().R
+                + ", current index value: " + getIndexValue(currentRound));
 
         view.statsTableModel.fireTableDataChanged();
     }
@@ -557,7 +562,7 @@ public class MainAgent extends Agent {
         private int draws;
         private float money;
         private float assets;
-        private String lastActions ="";
+        private String lastActions = "";
 
         public String getLastActions() {
             return lastActions;
