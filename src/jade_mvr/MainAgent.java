@@ -21,6 +21,7 @@ import javax.swing.SwingUtilities;
 
 import java.awt.Component;
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 
 public class MainAgent extends Agent {
     private static GUI view;
@@ -28,6 +29,7 @@ public class MainAgent extends Agent {
     private static boolean verbose = false;
     private static ArrayList<String> agentTypesList = new ArrayList<String>();
     private static ArrayList<PlayerInformation> playerAgents = new ArrayList<PlayerInformation>();
+    public static Object roundLock = new Object();
     private int currentRound = 0;
     private int stopAtRound = 0;
 
@@ -97,18 +99,15 @@ public class MainAgent extends Agent {
         createPlayersAndAddToTable();
         sendConfigToPlayers();
         // TODO: ejecuta todas las rondas sin parar
+        // TODO: cambiar enabled botones
         new Thread(() -> {
             for (int i = 0; i < MainAgent.getGameParameters().R; i++) {
-                while (stopAtRound > currentRound) {
-                    // Continue playing rounds
-                    playRound();
-                    processRoundOver();
-
-                    // Check if we need to pause
-                    synchronized (this) {
-                        if (stopAtRound <= currentRound) {
-                            // We have executed all requested rounds
-                            SwingUtilities.invokeLater(() -> {
+                // Check if we need to pause
+                synchronized (MainAgent.roundLock) {
+                    if (stopAtRound <= currentRound) {
+                        // We have executed all requested rounds
+                        try {
+                            SwingUtilities.invokeAndWait(() -> {
                                 view.newGameButton.setEnabled(false);
                                 view.quitGameButton.setEnabled(true);
                                 view.resetStatsButton.setEnabled(true);
@@ -117,15 +116,21 @@ public class MainAgent extends Agent {
                                 view.playXRoundsButton.setEnabled(true);
                                 view.playXRoundsSpinner.setEnabled(true);
                             });
+                        } catch (InvocationTargetException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        } catch (InterruptedException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
 
-                            try {
-                                this.wait(); // Wait without blocking the GUI thread
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                                SwingUtilities.invokeLater(() -> {
-                                    view.appendLog("Thread interrupted: " + e.getMessage(), true);
-                                });
-                            }
+                        try {
+                            roundLock.wait(); // Wait without blocking the GUI thread
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            SwingUtilities.invokeLater(() -> {
+                                view.appendLog("Thread interrupted: " + e.getMessage(), true);
+                            });
                         }
                     }
                 }
@@ -147,19 +152,17 @@ public class MainAgent extends Agent {
     }
 
     private void playXRounds(int rounds) {
-        // TODO: cambiar enabled botones
         setStopAtRound(currentRound + rounds);
     }
 
     private void setStopAtRound(int round) {
-        synchronized (this) {
+        synchronized (roundLock) {
             stopAtRound = round;
-            this.notifyAll(); // Notify all waiting threads
+            roundLock.notifyAll(); // Notify all waiting threads
         }
     }
 
     private void pauseGame() {
-        // TODO: cambiar enabled botones
         setStopAtRound(currentRound);
     }
 
@@ -308,7 +311,8 @@ public class MainAgent extends Agent {
 
         // añadir 1 a currentRound, mostrar +1 para que empiece en 1
         view.verboseLabel.setText("Round " + (currentRound++ + 1) + " / " + getGameParameters().R
-                + ", current index value: " + getIndexValue(currentRound));
+                + ", index value: " + getIndexValue(currentRound) + " , inflation rate: "
+                + getInflationRate(currentRound));
 
         view.statsTableModel.fireTableDataChanged();
     }
@@ -509,6 +513,7 @@ public class MainAgent extends Agent {
     }
 
     private void resetStats() {
+        // TODO: cambiar stats en arraylist no solo en la tabla
         // grafico
         view.appendLog("Stats reset", false);
 
@@ -641,10 +646,10 @@ public class MainAgent extends Agent {
 
         // Keep last 5 actions
         public void addLastAction(String action) {
-            if (this.lastActions.length() >= 5) {
-                this.lastActions = this.lastActions.substring(1);
+            this.lastActions = action + this.lastActions;
+            if (this.lastActions.length() > 5) {
+                this.lastActions = this.lastActions.substring(0, 5);
             }
-            this.lastActions += action;
         }
 
         public int getWins() {
