@@ -36,7 +36,7 @@ public class MainAgent extends Agent {
     private float getIndexValue() {
         return (float) 10.00;
     }
-
+    // TODO: get inflation rate
     @Override
     protected void setup() {
 
@@ -97,7 +97,7 @@ public class MainAgent extends Agent {
         sendConfigToPlayers();
         for (int i = 0; i < MainAgent.getGameParameters().R; i++) {
             playRound();
-            processRoundOver();
+            processRoundOver(); // TODO: comission fees
         }
         processGameOver();
     }
@@ -132,8 +132,8 @@ public class MainAgent extends Agent {
             send(roundOverMsg);
         }
 
+
         // Receive buy/sell orders from players
-        // TODO hacer que random agent compre y venda
         java.util.Map<AID, ACLMessage> receivedMessages = new HashMap<>();
         
         while (receivedMessages.size() < playerAgents.size()) {
@@ -144,6 +144,7 @@ public class MainAgent extends Agent {
                     receivedMessages.put(sender, msg);
                     String content = msg.getContent();
                     String[] parts = content.split("#");
+                    System.out.println("Received message: " + content);
                     if (parts.length == 2) {
                         String action = parts[0];
                         float amount;
@@ -191,6 +192,15 @@ public class MainAgent extends Agent {
                 }
             }
         }
+
+        // Send Accounting message to each player
+        for (PlayerInformation player : playerAgents) {
+            ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
+            String content = String.format("Accounting#%d#%.2f#%.2f", player.id, player.getMoney(), player.getAssets());
+            accountingMsg.setContent(content);
+            accountingMsg.addReceiver(player.aid);
+            send(accountingMsg);
+        }
     }
 
     private void playRound() {
@@ -226,6 +236,7 @@ public class MainAgent extends Agent {
             view.statsTableModel.setValueAt(player.getLosses(), k, 2); // Losses
             view.statsTableModel.setValueAt(player.getDraws(), k, 3); // Draws
             view.statsTableModel.setValueAt(player.getMoney(), k, 4); // Money
+            view.statsTableModel.setValueAt(player.getAssets(), k, 5); // Assets
             view.statsTableModel.setValueAt(player.getLastActions(), k, 6); // LAST ACTIONS
         }
 

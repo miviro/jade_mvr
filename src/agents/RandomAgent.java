@@ -103,9 +103,16 @@ public class RandomAgent extends Agent {
                                 printColored(getAID().getName() + ":" + state.name() + " - Bad message");
                             }
                         } else if (msg.getPerformative() == ACLMessage.REQUEST && msg.getContent().startsWith("RoundOver")) {
-                            state = State.waitAccounting;
+                            ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
+                            accountingMsg.addReceiver(mainAgent);
+                            String action = new Random().nextBoolean() ? "Buy" : "Sell";
+                            accountingMsg.setContent(action + "#" + 1); // TODO: raro: hay assets decimales cuando deberian ser enteros
+                            printColored(getAID().getName() + " sent " + accountingMsg.getContent());
+                            send(accountingMsg);
+
+                            state = State.waitAccounting; // TODO se queda aqui
                         } else if (msg.getPerformative() == ACLMessage.INFORM && msg.getContent().startsWith("GameOver")) {
-                            takeDown();
+                            System.out.println("Game Over " + getAID().getName());
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
                         }
@@ -142,12 +149,6 @@ public class RandomAgent extends Agent {
                         // Else ERROR
 
                         if (msg.getPerformative() == ACLMessage.INFORM && msg.getContent().startsWith("Accounting#")) {
-                            ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
-                            accountingMsg.addReceiver(mainAgent);
-                            String action = new Random().nextBoolean() ? "Buy" : "Sell";
-                            accountingMsg.setContent(action + " 1 asset");
-                            printColored(getAID().getName() + " sent " + accountingMsg.getContent());
-                            send(accountingMsg);
                             state = State.waitGame;
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
