@@ -266,7 +266,7 @@ public class MainAgent extends Agent {
                                 } else if ("Sell".equalsIgnoreCase(action)) {
                                     if (player.getAssets() >= amount) {
                                         float assetValue = amount * getIndexValue(currentRound);
-                                        float fee = assetValue * (1 - (float) getGameParameters().S);
+                                        float fee = assetValue * ((float) getGameParameters().S / 100);
                                         player.setAssets(player.getAssets() - amount);
                                         player.setMoney(player.getMoney() + assetValue - fee);
                                         view.appendLog("Player " + player.id + " sold assets worth " + assetValue,
@@ -534,8 +534,8 @@ public class MainAgent extends Agent {
     }
 
     private void quitGame() {
-        processGameOver(); // para que no peten los mensajes
         gameRunning = false;
+        processGameOver(); // para que no peten los mensajes
 
         if (gameThread != null && gameThread.isAlive()) {
             gameThread.interrupt();
@@ -555,7 +555,7 @@ public class MainAgent extends Agent {
         view.playAllRoundsButton.setEnabled(false);
         view.playXRoundsButton.setEnabled(false);
         view.playXRoundsSpinner.setEnabled(false);
-        view.verboseLabel.setText("Round 0 / null, index value: nulll , inflation rate: null");
+        view.verboseLabel.setText("Round 0 / null, index value: null , inflation rate: null");
 
         view.setPanelEnabled(view.configPanel, true);
 
@@ -624,6 +624,19 @@ public class MainAgent extends Agent {
             view.newGameButton.addActionListener(e -> startNewGame());
             view.quitGameButton.addActionListener(e -> quitGame());
             view.resetStatsButton.addActionListener(e -> resetStats());
+            view.table.addMouseListener(new java.awt.event.MouseAdapter() {
+                @Override
+                public void mouseClicked(java.awt.event.MouseEvent e) {
+                    int row = view.table.rowAtPoint(e.getPoint());
+                    int col = view.table.columnAtPoint(e.getPoint());
+                    if (row >= 0 && col >= 0) {
+                        if (col == 7) {
+                            String agentName = (String) view.statsTableModel.getValueAt(row, 0);
+                            deleteAgent(agentName);
+                        }
+                    }
+                }
+            });
 
             view.stopButton.addActionListener(e -> pauseGame());
             // view.continueButton.addActionListener(e -> setStopAtRound(currentRound + 1));

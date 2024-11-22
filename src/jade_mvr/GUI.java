@@ -3,7 +3,6 @@ package src.jade_mvr;
 import javax.swing.*;
 import javax.swing.event.ChangeListener;
 import javax.swing.table.DefaultTableModel;
-import javax.swing.table.TableCellRenderer;
 
 import src.jade_mvr.MainAgent.GameParametersStruct;
 
@@ -24,6 +23,7 @@ public class GUI extends JFrame {
     public JPanel rightPanel;
     public JPanel statsPanel;
     public JPanel logPanel;
+    public JTable table;
     public JPanel knownAgentsPanel;
     public JButton newGameButton;
     public JButton quitGameButton;
@@ -62,7 +62,8 @@ public class GUI extends JFrame {
         quitMenu.add(confirmMenuItem);
 
         // About
-        JMenuItem aboutMenuItem = new JMenuItem("Author: Miguel Vila Rodríguez - 2024 - https://github.com/miviro/jade_mvr");
+        JMenuItem aboutMenuItem = new JMenuItem(
+                "Author: Miguel Vila Rodríguez - 2024 - https://github.com/miviro/jade_mvr");
         aboutMenuItem.addActionListener(actionEvent -> {
             try {
                 Desktop.getDesktop().browse(URI.create("https://github.com/miviro/jade_mvr"));
@@ -70,7 +71,7 @@ public class GUI extends JFrame {
                 ex.printStackTrace();
             }
         });
-        
+
         menuBar.add(quitMenu);
         menuBar.add(aboutMenuItem);
         menuBar.add(Box.createHorizontalGlue());
@@ -225,13 +226,11 @@ public class GUI extends JFrame {
         statsTableModel = new DefaultTableModel(data, columnNames) {
             @Override
             public boolean isCellEditable(int row, int column) {
-                return column == 8; // Only the "Delete" column is editable
+                return false;
             }
         };
 
-        JTable table = new JTable(statsTableModel);
-        table.getColumn("Delete").setCellRenderer(new ButtonRenderer());
-        table.getColumn("Delete").setCellEditor(new ButtonEditor(new JCheckBox()));
+        table = new JTable(statsTableModel);
 
         JScrollPane scrollPane = new JScrollPane(table);
         table.setFillsViewportHeight(true);
@@ -246,62 +245,6 @@ public class GUI extends JFrame {
         statsTableModel.setRowCount(0);
         for (Object[] row : data) {
             statsTableModel.addRow(row);
-        }
-    }
-
-    class ButtonRenderer extends JButton implements TableCellRenderer {
-        public ButtonRenderer() {
-            setOpaque(true);
-        }
-
-        @Override
-        public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
-                int row, int column) {
-            setText((value == null) ? "" : value.toString());
-            return this;
-        }
-    }
-
-    class ButtonEditor extends DefaultCellEditor {
-        private String label;
-        private boolean isPushed;
-
-        public ButtonEditor(JCheckBox checkBox) {
-            super(checkBox);
-        }
-
-        @Override
-        public Component getTableCellEditorComponent(JTable table, Object value, boolean isSelected, int row,
-                int column) {
-            label = (value == null) ? "" : value.toString();
-            JButton button = new JButton(label);
-            button.addActionListener(e -> fireEditingStopped());
-            isPushed = true;
-            return button;
-        }
-
-        @Override
-        public Object getCellEditorValue() {
-            if (isPushed) {
-                appendLog("Delete button clicked", false);
-            }
-            isPushed = false;
-            return label;
-        }
-
-        @Override
-        public boolean stopCellEditing() {
-            isPushed = false;
-            return super.stopCellEditing();
-        }
-
-        @Override
-        protected void fireEditingStopped() {
-            super.fireEditingStopped();
-        }
-
-        private void handleDeleteAgent() {
-            appendLog("Delete button clicked", false);
         }
     }
 
