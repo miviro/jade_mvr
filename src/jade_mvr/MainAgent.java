@@ -17,6 +17,7 @@ import java.util.HashMap;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
+import javax.swing.SwingUtilities;
 
 import java.awt.Component;
 import java.io.File;
@@ -95,41 +96,54 @@ public class MainAgent extends Agent {
         // Añadir jugadores a la tabla de estadísticas
         createPlayersAndAddToTable();
         sendConfigToPlayers();
-        for (int i = 0; i < MainAgent.getGameParameters().R; i++) {
-            synchronized (this) {
-                while (stopAtRound <= currentRound) {
-                    // si estamos aqui, hemos ejecutado todas las rondas que podiamos
-                    view.newGameButton.setEnabled(false);
-                    view.quitGameButton.setEnabled(true);
-                    view.resetStatsButton.setEnabled(true);
-                    view.stopButton.setEnabled(false);
-                    // view.continueButton.setEnabled(true);
-                    view.playAllRoundsButton.setEnabled(true);
-                    view.playXRoundsButton.setEnabled(true);
-                    view.playXRoundsSpinner.setEnabled(true);
+        // TODO: ejecuta todas las rondas sin parar
+        new Thread(() -> {
+            for (int i = 0; i < MainAgent.getGameParameters().R; i++) {
+                while (stopAtRound > currentRound) {
+                    // Continue playing rounds
+                    playRound();
+                    processRoundOver();
 
-                    try {
-                        this.wait(); // TODO: se queda aqui y nunca podemos salir ya que no cambia la GUI
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        view.appendLog("Thread interrupted: " + e.getMessage(), true);
+                    // Check if we need to pause
+                    synchronized (this) {
+                        if (stopAtRound <= currentRound) {
+                            // We have executed all requested rounds
+                            SwingUtilities.invokeLater(() -> {
+                                view.newGameButton.setEnabled(false);
+                                view.quitGameButton.setEnabled(true);
+                                view.resetStatsButton.setEnabled(true);
+                                view.stopButton.setEnabled(false);
+                                view.playAllRoundsButton.setEnabled(true);
+                                view.playXRoundsButton.setEnabled(true);
+                                view.playXRoundsSpinner.setEnabled(true);
+                            });
+
+                            try {
+                                this.wait(); // Wait without blocking the GUI thread
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                SwingUtilities.invokeLater(() -> {
+                                    view.appendLog("Thread interrupted: " + e.getMessage(), true);
+                                });
+                            }
+                        }
                     }
                 }
-            }
-            // si estamos aqui, tenemos rondas por ejecutar
-            view.newGameButton.setEnabled(false);
-            view.quitGameButton.setEnabled(false);
-            view.resetStatsButton.setEnabled(false);
-            view.stopButton.setEnabled(true);
-            // view.continueButton.setEnabled(false);
-            view.playAllRoundsButton.setEnabled(false);
-            view.playXRoundsButton.setEnabled(false);
-            view.playXRoundsSpinner.setEnabled(false);
+                // si estamos aqui, tenemos rondas por ejecutar
+                view.newGameButton.setEnabled(false);
+                view.quitGameButton.setEnabled(false);
+                view.resetStatsButton.setEnabled(false);
+                view.stopButton.setEnabled(true);
+                // view.continueButton.setEnabled(false);
+                view.playAllRoundsButton.setEnabled(false);
+                view.playXRoundsButton.setEnabled(false);
+                view.playXRoundsSpinner.setEnabled(false);
 
-            playRound();
-            processRoundOver();
-        }
-        processGameOver();
+                playRound();
+                processRoundOver();
+            }
+            processGameOver();
+        }).start();
     }
 
     private void playXRounds(int rounds) {
