@@ -28,6 +28,7 @@ public class MainAgent extends Agent {
     private static ArrayList<String> agentTypesList = new ArrayList<String>();
     private static ArrayList<PlayerInformation> playerAgents = new ArrayList<PlayerInformation>();
     private int currentRound = 0;
+    private int stopAtRound = 0;
 
     private float getIndexValue(int currentRound) {
         return (float) 10.00;
@@ -84,7 +85,6 @@ public class MainAgent extends Agent {
         view.quitGameButton.setEnabled(true);
         view.resetStatsButton.setEnabled(true);
         view.stopButton.setEnabled(false);
-        view.continueButton.setEnabled(false);
         view.playAllRoundsButton.setEnabled(true);
         view.playXRoundsButton.setEnabled(true);
         view.playXRoundsSpinner.setEnabled(true);
@@ -96,10 +96,57 @@ public class MainAgent extends Agent {
         createPlayersAndAddToTable();
         sendConfigToPlayers();
         for (int i = 0; i < MainAgent.getGameParameters().R; i++) {
+            synchronized (this) {
+                while (stopAtRound <= currentRound) {
+                    // si estamos aqui, hemos ejecutado todas las rondas que podiamos
+                    view.newGameButton.setEnabled(false);
+                    view.quitGameButton.setEnabled(true);
+                    view.resetStatsButton.setEnabled(true);
+                    view.stopButton.setEnabled(false);
+                    // view.continueButton.setEnabled(true);
+                    view.playAllRoundsButton.setEnabled(true);
+                    view.playXRoundsButton.setEnabled(true);
+                    view.playXRoundsSpinner.setEnabled(true);
+
+                    try {
+                        this.wait(); // TODO: se queda aqui y nunca podemos salir ya que no cambia la GUI
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        view.appendLog("Thread interrupted: " + e.getMessage(), true);
+                    }
+                }
+            }
+            // si estamos aqui, tenemos rondas por ejecutar
+            view.newGameButton.setEnabled(false);
+            view.quitGameButton.setEnabled(false);
+            view.resetStatsButton.setEnabled(false);
+            view.stopButton.setEnabled(true);
+            // view.continueButton.setEnabled(false);
+            view.playAllRoundsButton.setEnabled(false);
+            view.playXRoundsButton.setEnabled(false);
+            view.playXRoundsSpinner.setEnabled(false);
+
             playRound();
             processRoundOver();
         }
         processGameOver();
+    }
+
+    private void playXRounds(int rounds) {
+        // TODO: cambiar enabled botones
+        setStopAtRound(currentRound + rounds);
+    }
+
+    private void setStopAtRound(int round) {
+        synchronized (this) {
+            stopAtRound = round;
+            this.notifyAll(); // Notify all waiting threads
+        }
+    }
+
+    private void pauseGame() {
+        // TODO: cambiar enabled botones
+        setStopAtRound(currentRound);
     }
 
     private void processGameOver() {
@@ -413,7 +460,7 @@ public class MainAgent extends Agent {
         view.quitGameButton.setEnabled(false);
         view.resetStatsButton.setEnabled(false);
         view.stopButton.setEnabled(false);
-        view.continueButton.setEnabled(false);
+        // view.continueButton.setEnabled(false);
         view.playAllRoundsButton.setEnabled(false);
         view.playXRoundsButton.setEnabled(false);
         view.playXRoundsSpinner.setEnabled(false);
@@ -474,6 +521,11 @@ public class MainAgent extends Agent {
             view.newGameButton.addActionListener(e -> startNewGame());
             view.quitGameButton.addActionListener(e -> quitGame());
             view.resetStatsButton.addActionListener(e -> resetStats());
+
+            view.stopButton.addActionListener(e -> pauseGame());
+            // view.continueButton.addActionListener(e -> setStopAtRound(currentRound + 1));
+            view.playAllRoundsButton.addActionListener(e -> playXRounds(getGameParameters().R));
+            view.playXRoundsButton.addActionListener(e -> playXRounds((Integer) view.playXRoundsSpinner.getValue()));
 
             updatePlayers();
             view.appendLog("Application started", false);

@@ -30,7 +30,7 @@ public class GUI extends JFrame {
     public JButton quitGameButton;
     public JButton resetStatsButton;
     public JButton stopButton;
-    public JButton continueButton;
+    // public JButton continueButton;
     public JButton playAllRoundsButton;
     public JButton playXRoundsButton;
     public JSpinner playXRoundsSpinner;
@@ -95,7 +95,6 @@ public class GUI extends JFrame {
         actionsPanel.setPreferredSize(new Dimension(1200, 60));
 
         newGameButton = new JButton("New Game");
-        // newGameButton.addActionListener(e -> newGame());
 
         quitGameButton = new JButton("Quit Game");
         quitGameButton.setEnabled(false);
@@ -105,8 +104,8 @@ public class GUI extends JFrame {
 
         stopButton = new JButton("Stop");
         stopButton.setEnabled(false);
-        continueButton = new JButton("Continue");
-        continueButton.setEnabled(false);
+        // continueButton = new JButton("Continue"); // TODO controlar rondas
+        // continueButton.setEnabled(false);
         playAllRoundsButton = new JButton("Play All Rounds");
         playAllRoundsButton.setEnabled(false);
 
@@ -120,7 +119,7 @@ public class GUI extends JFrame {
         actionsPanel.add(quitGameButton);
         actionsPanel.add(resetStatsButton);
         actionsPanel.add(stopButton);
-        actionsPanel.add(continueButton);
+        // actionsPanel.add(continueButton);
         actionsPanel.add(playAllRoundsButton);
         actionsPanel.add(playXRoundsButton);
         actionsPanel.add(playXRoundsSpinner);
