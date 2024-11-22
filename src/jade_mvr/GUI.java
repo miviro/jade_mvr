@@ -179,7 +179,7 @@ public class GUI extends JFrame {
     }
 
     private JPanel createParametersPanel() {
-        JPanel parametersPanel = new JPanel(new GridLayout(4, 2, 10, 10));
+        JPanel parametersPanel = new JPanel(new GridLayout(3, 2, 10, 10));
         parametersPanel.setBorder(BorderFactory.createTitledBorder("Parameters"));
 
         // Retrieve current parameters
@@ -188,23 +188,19 @@ public class GUI extends JFrame {
         JSpinner nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 1000, 1));
         JSpinner sSpinner = new JSpinner(new SpinnerNumberModel(params.S, 0, 100, 1));
         JSpinner rSpinner = new JSpinner(new SpinnerNumberModel(params.R, 1, 1000, 1));
-        JSpinner iSpinner = new JSpinner(new SpinnerNumberModel(params.I, 0, 100, 1));
         parametersPanel.add(new JLabel("Number of players (N):"));
         parametersPanel.add(nSpinner);
         parametersPanel.add(new JLabel("Stock exchange fee (S%):"));
         parametersPanel.add(sSpinner);
         parametersPanel.add(new JLabel("Number of rounds (R):"));
         parametersPanel.add(rSpinner);
-        parametersPanel.add(new JLabel("Inflation rate (I%):"));
-        parametersPanel.add(iSpinner);
 
         ChangeListener updateListener = e -> {
             try {
                 int n = (Integer) nSpinner.getValue();
                 int r = (Integer) rSpinner.getValue();
                 int s = (Integer) sSpinner.getValue();
-                int i = (Integer) iSpinner.getValue();
-                MainAgent.setGameParameters(new GameParametersStruct(n, r, s, i));
+                MainAgent.setGameParameters(new GameParametersStruct(n, r, s));
                 // Update known agents panel
                 configPanel.remove(knownAgentsPanel);
                 knownAgentsPanel = createKnownAgentsPanel();
@@ -220,7 +216,6 @@ public class GUI extends JFrame {
         nSpinner.addChangeListener(updateListener);
         sSpinner.addChangeListener(updateListener);
         rSpinner.addChangeListener(updateListener);
-        iSpinner.addChangeListener(updateListener);
 
         return parametersPanel;
     }

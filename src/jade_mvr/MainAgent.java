@@ -33,10 +33,15 @@ public class MainAgent extends Agent {
     private static ArrayList<PlayerInformation> playerAgents = new ArrayList<PlayerInformation>();
     private int currentRound = 0;
 
+
+    // TODO: que dependan de currentRound
     private float getIndexValue() {
         return (float) 10.00;
     }
-    // TODO: get inflation rate
+    private float getInflationRate() {
+        return (float) 1 / 100;
+    }
+
     @Override
     protected void setup() {
 
@@ -122,11 +127,11 @@ public class MainAgent extends Agent {
         for (PlayerInformation player : playerAgents) {
             ACLMessage roundOverMsg = new ACLMessage(ACLMessage.REQUEST);
             float totalRoundPayoff = player.getMoney();
-            float totalRoundMoney = player.getMoney() * (1 + (float) gameParameters.I / 100);
+            float totalRoundMoney = player.getMoney() * (1 + (float) getInflationRate());
             float totalRoundAssets = player.getAssets();
             float assetPrice = totalRoundAssets > 0 ? totalRoundMoney / totalRoundAssets : 0;
             String content = "RoundOver#" + player.id + "#" + totalRoundPayoff + "#" + totalRoundMoney + "#"
-                    + (float) gameParameters.I / 100 + "#" + totalRoundAssets + "#" + assetPrice;
+                    + getInflationRate() + "#" + totalRoundAssets + "#" + assetPrice;
             roundOverMsg.setContent(content);
             roundOverMsg.addReceiver(player.aid);
             send(roundOverMsg);
@@ -162,7 +167,7 @@ public class MainAgent extends Agent {
                                     if (player.getMoney() >= amount) {
                                         player.setMoney(player.getMoney() - amount);
                                         player.setAssets(player.getAssets() + amount / getIndexValue());
-                                        view.appendLog("Player " + player.id + " bought assets worth " + amount, false);
+                                        view.appendLog("Player " + player.id + " bought " + amount + " assets " , false);
                                     } else {
                                         view.appendLog("Player " + player.id + " tried to buy more than they have.", true);
                                     }
@@ -503,7 +508,7 @@ public class MainAgent extends Agent {
     public static void setGameParameters(GameParametersStruct gameParameters) {
         MainAgent.gameParameters = gameParameters;
         view.appendLog("Parameters set to: N=" + gameParameters.N + ", S=" + gameParameters.S + ", R="
-                + gameParameters.R + ", I=" + gameParameters.I, true);
+                + gameParameters.R, true);
     }
 
     public static void main(String[] args) {
@@ -531,28 +536,24 @@ public class MainAgent extends Agent {
         int N;
         int R;
         int S;
-        int I;
 
         public GameParametersStruct() {
             N = 2;
             R = 500;
             S = 4;
-            I = 1;
         }
 
-        public GameParametersStruct(int n, int r, int s, int i) {
+        public GameParametersStruct(int n, int r, int s) {
             N = n;
             R = r;
             S = s;
-            I = i;
         }
 
         @Override
         public String toString() {
             return "N=" + N +
                     ", R=" + R +
-                    ", S=" + S +
-                    ", I=" + I;
+                    ", S=" + S;
         }
     }
 
