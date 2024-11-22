@@ -184,10 +184,9 @@ public class GUI extends JFrame {
 
         // Retrieve current parameters
         GameParametersStruct params = MainAgent.getGameParameters();
-        // TODO: quitar I?
-        JSpinner nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 1000, 1));
-        JSpinner sSpinner = new JSpinner(new SpinnerNumberModel(params.S, 0, 100, 1));
-        JSpinner rSpinner = new JSpinner(new SpinnerNumberModel(params.R, 1, 1000, 1));
+        JSpinner nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 100000, 1));
+        JSpinner sSpinner = new JSpinner(new SpinnerNumberModel(params.S, 0, 10000, 1));
+        JSpinner rSpinner = new JSpinner(new SpinnerNumberModel(params.R, 1, 100000, 1));
         parametersPanel.add(new JLabel("Number of players (N):"));
         parametersPanel.add(nSpinner);
         parametersPanel.add(new JLabel("Stock exchange fee (S%):"));
@@ -330,7 +329,7 @@ public class GUI extends JFrame {
         verboseCheckBox.addActionListener(e -> MainAgent.setVerbose(verboseCheckBox.isSelected()));
         titlePanel.add(verboseCheckBox);
 
-        verboseLabel = new JLabel("Round 0 / null, current index value: null");
+        verboseLabel = new JLabel("Round 0 / null, current index value: null, current inflation rate: null");
         titlePanel.add(verboseLabel);
 
         logPanel.add(titlePanel, BorderLayout.NORTH);

@@ -15,8 +15,11 @@ public class RandomAgent extends Agent {
 
     private State state;
     private AID mainAgent;
+    @SuppressWarnings("unused")
     private int myId, opponentId;
+    @SuppressWarnings("unused")
     private int N, R;
+    @SuppressWarnings("unused")
     private float S;
     private ACLMessage msg;
 
@@ -110,7 +113,7 @@ public class RandomAgent extends Agent {
                             printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                             send(accountingMsg);
 
-                            state = State.waitAccounting; // TODO se queda aqui
+                            state = State.waitAccounting;
                         } else if (msg.getPerformative() == ACLMessage.INFORM && msg.getContent().startsWith("GameOver")) {
                             System.out.println("Game Over " + getAID().getName());
                         } else {

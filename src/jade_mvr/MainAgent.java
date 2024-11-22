@@ -10,8 +10,6 @@ import jade.domain.FIPAException;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.lang.acl.ACLMessage;
-import jade.lang.acl.MessageTemplate;
-import jade.util.leap.Map;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,11 +17,9 @@ import java.util.HashMap;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
-import javax.swing.SwingUtilities;
 
 import java.awt.Component;
 import java.io.File;
-import java.lang.reflect.InvocationTargetException;
 
 public class MainAgent extends Agent {
     private static GUI view;
@@ -34,11 +30,10 @@ public class MainAgent extends Agent {
     private int currentRound = 0;
 
 
-    // TODO: que dependan de currentRound
-    private float getIndexValue() {
+    private float getIndexValue(int currentRound) {
         return (float) 10.00;
     }
-    private float getInflationRate() {
+    private float getInflationRate(int currentRound) {
         return (float) 1 / 100;
     }
 
@@ -102,14 +97,14 @@ public class MainAgent extends Agent {
         sendConfigToPlayers();
         for (int i = 0; i < MainAgent.getGameParameters().R; i++) {
             playRound();
-            processRoundOver(); // TODO: comission fees
-        }
+            processRoundOver();
+                }
         processGameOver();
     }
 
     private void processGameOver() {
         for (PlayerInformation player : playerAgents) {
-            float assetsValue = player.getAssets() * getIndexValue();
+            float assetsValue = player.getAssets() * getIndexValue(currentRound);
             float totalPayoff = player.getMoney() + assetsValue;
             float fee = assetsValue * ((float) gameParameters.S / 100);
             totalPayoff -= fee;
@@ -127,11 +122,11 @@ public class MainAgent extends Agent {
         for (PlayerInformation player : playerAgents) {
             ACLMessage roundOverMsg = new ACLMessage(ACLMessage.REQUEST);
             float totalRoundPayoff = player.getMoney();
-            float totalRoundMoney = player.getMoney() * (1 + (float) getInflationRate());
+            float totalRoundMoney = player.getMoney() * (1 + (float) getInflationRate(currentRound));
             float totalRoundAssets = player.getAssets();
             float assetPrice = totalRoundAssets > 0 ? totalRoundMoney / totalRoundAssets : 0;
             String content = "RoundOver#" + player.id + "#" + totalRoundPayoff + "#" + totalRoundMoney + "#"
-                    + getInflationRate() + "#" + totalRoundAssets + "#" + assetPrice;
+                    + getInflationRate(currentRound) + "#" + totalRoundAssets + "#" + assetPrice;
             roundOverMsg.setContent(content);
             roundOverMsg.addReceiver(player.aid);
             send(roundOverMsg);
@@ -166,16 +161,17 @@ public class MainAgent extends Agent {
                                 if ("Buy".equalsIgnoreCase(action)) {
                                     if (player.getMoney() >= amount) {
                                         player.setMoney(player.getMoney() - amount);
-                                        player.setAssets(player.getAssets() + amount / getIndexValue());
+                                        player.setAssets(player.getAssets() + amount / getIndexValue(currentRound));
                                         view.appendLog("Player " + player.id + " bought " + amount + " assets " , false);
                                     } else {
                                         view.appendLog("Player " + player.id + " tried to buy more than they have.", true);
                                     }
                                 } else if ("Sell".equalsIgnoreCase(action)) {
                                     if (player.getAssets() >= amount) {
-                                        float assetValue = amount * getIndexValue();
+                                        float assetValue = amount * getIndexValue(currentRound);
+                                        float fee = assetValue * (1 - (float) getGameParameters().S);
                                         player.setAssets(player.getAssets() - amount);
-                                        player.setMoney(player.getMoney() + assetValue);
+                                        player.setMoney(player.getMoney() + assetValue - fee);
                                         view.appendLog("Player " + player.id + " sold assets worth " + assetValue, false);
                                     } else {
                                         view.appendLog("Player " + player.id + " tried to sell more than they have.", true);
@@ -246,12 +242,11 @@ public class MainAgent extends Agent {
         }
 
         // añadir 1 a currentRound, mostrar +1 para que empiece en 1
-        view.verboseLabel.setText("Round " + (currentRound++ + 1) + " / " + getGameParameters().R + ", current index value: " + getIndexValue());
+        view.verboseLabel.setText("Round " + (currentRound++ + 1) + " / " + getGameParameters().R + ", current index value: " + getIndexValue(currentRound));
 
         view.statsTableModel.fireTableDataChanged();
     }
 
-    // TODO: return info about the game
     private GameInfo playGame(PlayerInformation player1, PlayerInformation player2) {
         // Send INFORM NewGame#[player1.id]#[player2.id] to both players
         ACLMessage newGameMsg = new ACLMessage(ACLMessage.INFORM);
@@ -313,20 +308,17 @@ public class MainAgent extends Agent {
         resultsMsg.addReceiver(player1.aid);
         resultsMsg.addReceiver(player2.aid);
         send(resultsMsg);
-        return new GameInfo(player1.id, player2.id, player1Action, player2Action, player1Reward, player2Reward);
+        return new GameInfo(player1Action, player2Action, player1Reward, player2Reward);
     }
 
     private class GameInfo {
-        int player1Id;
-        int player2Id;
+
         String player1Action;
         String player2Action;
         int player1Reward;
         int player2Reward;
 
-        public GameInfo(int p1, int p2, String p1a, String p2a, int p1r, int p2r) {
-            player1Id = p1;
-            player2Id = p2;
+        public GameInfo(String p1a, String p2a, int p1r, int p2r) {
             player1Action = p1a;
             player2Action = p2a;
             player1Reward = p1r;
