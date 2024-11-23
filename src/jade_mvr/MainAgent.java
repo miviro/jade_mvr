@@ -154,6 +154,10 @@ public class MainAgent extends Agent {
 
                     playRound();
                     processRoundOver();
+                    // Reset current round money for all players
+                    for (PlayerInformation player : playerAgents) {
+                        player.setCurrentRoundMoney(0);
+                    }
                 }
                 processGameOver();
 
@@ -221,13 +225,16 @@ public class MainAgent extends Agent {
         // round money adjusted for inflation]#[inflation rate, decimal]#[total player
         // owned assets]#[asset individual price] to all players
         for (PlayerInformation player : playerAgents) {
+            float moneyWithInflation = player.getMoney() * (1 - getInflationRate(currentRound)); // TODO: aplicar antes o despues de la ronda la inflacion?
+            player.setMoney(moneyWithInflation);
+
             ACLMessage roundOverMsg = new ACLMessage(ACLMessage.REQUEST);
-            float totalRoundPayoff = player.getMoney(); // TODO: que sea el total de la ronda, no el total actual
-            float totalRoundMoney = player.getMoney();
-            float totalRoundAssets = player.getAssets();
-            float assetPrice = totalRoundAssets > 0 ? totalRoundMoney / totalRoundAssets : 0;
-            String content = "RoundOver#" + player.id + "#" + totalRoundPayoff + "#" + totalRoundMoney + "#"
-                    + getInflationRate(currentRound) + "#" + totalRoundAssets + "#" + assetPrice;
+            float totalRoundPayoff = player.getCurrentRoundMoney(); 
+            float totalMoney = player.getMoney();
+            float totalAssets = player.getAssets();
+            float assetPrice = getIndexValue(currentRound);
+            String content = "RoundOver#" + player.id + "#" + totalRoundPayoff + "#" + totalMoney + "#"
+                    + getInflationRate(currentRound) + "#" + totalAssets + "#" + assetPrice;
             roundOverMsg.setContent(content);
             roundOverMsg.addReceiver(player.aid);
             send(roundOverMsg);
@@ -268,7 +275,7 @@ public class MainAgent extends Agent {
                                         view.appendLog("Player " + player.id + " bought " + amount + " assets ", true);
                                     } else {
                                         view.appendLog("Player " + player.id + " tried to buy more than they have.",
-                                        true);
+                                                true);
                                     }
                                 } else if ("Sell".equalsIgnoreCase(action)) {
                                     if (player.getAssets() >= amount) {
@@ -308,12 +315,6 @@ public class MainAgent extends Agent {
             accountingMsg.addReceiver(player.aid);
             send(accountingMsg);
         }
-
-        // Apply inflation to all agents' money
-        for (PlayerInformation player : playerAgents) {
-            float inflatedMoney = player.getMoney() * (1 - getInflationRate(currentRound));
-            player.setMoney(inflatedMoney);
-        }
     }
 
     private void playRound() {
@@ -340,6 +341,9 @@ public class MainAgent extends Agent {
 
                 player1.setMoney(player1.getMoney() + gameInfo.player1Reward);
                 player2.setMoney(player2.getMoney() + gameInfo.player2Reward);
+
+                player1.setCurrentRoundMoney(gameInfo.player1Reward);
+                player2.setCurrentRoundMoney(gameInfo.player2Reward);
 
                 player1.addLastAction(gameInfo.player1Action);
                 player2.addLastAction(gameInfo.player2Action);
@@ -386,7 +390,7 @@ public class MainAgent extends Agent {
         String player1Action = null;
         String player2Action = null;
         while (player1Action == null || player2Action == null) {
-            ACLMessage msg = blockingReceive(); // TODO: da error pero funciona
+            ACLMessage msg = blockingReceive(); // da error pero funciona
             if (msg != null) {
                 String[] content = msg.getContent().split("#");
                 if (content[0].equals("Action") && content.length > 1) {
@@ -493,7 +497,8 @@ public class MainAgent extends Agent {
 
                         try {
                             getContainerController()
-                                    .createNewAgent(agentType + agentIndex +"." + agendUniqueId, "src.agents." + agentType,
+                                    .createNewAgent(agentType + agentIndex + "." + agendUniqueId,
+                                            "src.agents." + agentType,
                                             null)
                                     .start();
                             // unique ID para evitar colisiones en los mensajes mandados a agentes que se
@@ -501,7 +506,7 @@ public class MainAgent extends Agent {
 
                             playerAgents.add(
                                     new PlayerInformation(
-                                            new AID(agentType + agentIndex +"." + agendUniqueId++, AID.ISLOCALNAME),
+                                            new AID(agentType + agentIndex + "." + agendUniqueId++, AID.ISLOCALNAME),
                                             agentIndex));
                             agentIndex++;
                         } catch (Exception e) {
@@ -558,12 +563,12 @@ public class MainAgent extends Agent {
 
     private void quitGame() {
         gameRunning = false;
-        
+
         if (gameThread != null && gameThread.isAlive()) {
             gameThread.interrupt();
             gameThread = null;
         }
-        
+
         processGameOver(); // para que no peten los mensajes
         currentRound = 0;
         stopAtRound = 0;
@@ -772,9 +777,19 @@ public class MainAgent extends Agent {
         private int losses;
         private int draws;
         private float money;
+        private float currentRoundMoney;
+
         private float assets;
         private String lastActions = "";
         private ArrayList<String> lastActionsList = new ArrayList<String>();
+
+        public float getCurrentRoundMoney() {
+            return currentRoundMoney;
+        }
+
+        public void setCurrentRoundMoney(float currentRoundMoney) {
+            this.currentRoundMoney = currentRoundMoney;
+        }
 
         public ArrayList<String> getLastActionsList() {
             return lastActionsList;
