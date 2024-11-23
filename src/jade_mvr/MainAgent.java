@@ -14,9 +14,12 @@ import jade.lang.acl.ACLMessage;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
+import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 
 import java.awt.Component;
@@ -30,18 +33,18 @@ public class MainAgent extends Agent {
     private static ArrayList<String> agentTypesList = new ArrayList<String>();
     private static ArrayList<PlayerInformation> playerAgents = new ArrayList<PlayerInformation>();
     public static Object roundLock = new Object();
-    private int currentRound = 0;
+    private static int currentRound = 0;
     private int stopAtRound = 0;
     private int agendUniqueId = 0;
 
     private Thread gameThread;
     private volatile boolean gameRunning = false;
 
-    private float getIndexValue(int currentRound) {
+    private static float getIndexValue(int currentRound) {
         return (float) 10.00;
     }
 
-    private float getInflationRate(int currentRound) {
+    private static float getInflationRate(int currentRound) {
         return (float) 1 / 100;
     }
 
@@ -210,6 +213,7 @@ public class MainAgent extends Agent {
             msg.addReceiver(player.aid);
             send(msg);
         }
+        view.appendLog("Game ended.", false);
     }
 
     private void processRoundOver() {
@@ -218,8 +222,8 @@ public class MainAgent extends Agent {
         // owned assets]#[asset individual price] to all players
         for (PlayerInformation player : playerAgents) {
             ACLMessage roundOverMsg = new ACLMessage(ACLMessage.REQUEST);
-            float totalRoundPayoff = player.getMoney();
-            float totalRoundMoney = player.getMoney() * (1 + (float) getInflationRate(currentRound));
+            float totalRoundPayoff = player.getMoney(); // TODO: que sea el total de la ronda, no el total actual
+            float totalRoundMoney = player.getMoney();
             float totalRoundAssets = player.getAssets();
             float assetPrice = totalRoundAssets > 0 ? totalRoundMoney / totalRoundAssets : 0;
             String content = "RoundOver#" + player.id + "#" + totalRoundPayoff + "#" + totalRoundMoney + "#"
@@ -264,7 +268,7 @@ public class MainAgent extends Agent {
                                         view.appendLog("Player " + player.id + " bought " + amount + " assets ", true);
                                     } else {
                                         view.appendLog("Player " + player.id + " tried to buy more than they have.",
-                                                false);
+                                        true);
                                     }
                                 } else if ("Sell".equalsIgnoreCase(action)) {
                                     if (player.getAssets() >= amount) {
@@ -276,7 +280,7 @@ public class MainAgent extends Agent {
                                                 true);
                                     } else {
                                         view.appendLog("Player " + player.id + " tried to sell more than they have.",
-                                                false);
+                                                true);
                                     }
                                 } else {
                                     view.appendLog("Invalid action '" + action + "' from player " + player.id, true);
@@ -304,6 +308,12 @@ public class MainAgent extends Agent {
             accountingMsg.addReceiver(player.aid);
             send(accountingMsg);
         }
+
+        // Apply inflation to all agents' money
+        for (PlayerInformation player : playerAgents) {
+            float inflatedMoney = player.getMoney() * (1 - getInflationRate(currentRound));
+            player.setMoney(inflatedMoney);
+        }
     }
 
     private void playRound() {
@@ -325,6 +335,9 @@ public class MainAgent extends Agent {
                     player2.setDraws(player2.getDraws() + 1);
                 }
 
+                player1.addLastActionList(gameInfo.resultContent);
+                player2.addLastActionList(gameInfo.resultContent);
+
                 player1.setMoney(player1.getMoney() + gameInfo.player1Reward);
                 player2.setMoney(player2.getMoney() + gameInfo.player2Reward);
 
@@ -343,10 +356,13 @@ public class MainAgent extends Agent {
             view.statsTableModel.setValueAt(player.getLastActions(), k, 6); // LAST ACTIONS
         }
 
+        // Sort players by total value and get the winner
+        ArrayList<PlayerInformation> sortedPlayers = new ArrayList<>(playerAgents);
+        sortedPlayers.sort((a, b) -> b.compareTo(a));
         // añadir 1 a currentRound, mostrar +1 para que empiece en 1
         view.verboseLabel.setText("Round " + (currentRound++ + 1) + " / " + getGameParameters().R
-                + ", index value: " + getIndexValue(currentRound) + " , inflation rate: "
-                + getInflationRate(currentRound));
+                + ", index value: " + getIndexValue(currentRound) + ", inflation rate: "
+                + getInflationRate(currentRound) + ", current winner: " + sortedPlayers.get(0).aid.getLocalName());
 
         view.statsTableModel.fireTableDataChanged();
     }
@@ -406,12 +422,14 @@ public class MainAgent extends Agent {
         // Send INFORM
         // Results#[player1.id],[player2.id]#[player1Action],[player2Action]#[player1Reward],[player2Reward]
         ACLMessage resultsMsg = new ACLMessage(ACLMessage.INFORM);
-        resultsMsg.setContent("Results#" + player1.id + "," + player2.id + "#" + player1Action + "," + player2Action
-                + "#" + player1Reward + "," + player2Reward);
+        String resultContent = "Results#" + player1.id + "," + player2.id + "#" + player1Action + "," + player2Action
+                + "#" + player1Reward + "," + player2Reward;
+        resultsMsg.setContent(resultContent);
         resultsMsg.addReceiver(player1.aid);
         resultsMsg.addReceiver(player2.aid);
         send(resultsMsg);
-        return new GameInfo(player1Action, player2Action, player1Reward, player2Reward);
+        return new GameInfo(player1Action, player2Action, player1Reward, player2Reward,
+                "Round: " + currentRound + ": " + resultContent);
 
     }
 
@@ -421,12 +439,14 @@ public class MainAgent extends Agent {
         String player2Action;
         int player1Reward;
         int player2Reward;
+        String resultContent;
 
-        public GameInfo(String p1a, String p2a, int p1r, int p2r) {
+        public GameInfo(String p1a, String p2a, int p1r, int p2r, String rc) {
             player1Action = p1a;
             player2Action = p2a;
             player1Reward = p1r;
             player2Reward = p2r;
+            resultContent = rc;
         }
     }
 
@@ -462,7 +482,7 @@ public class MainAgent extends Agent {
 
                 if (agentType != null && agentCount > 0) {
                     for (int i = 0; i < agentCount; i++) {
-                        data[agentIndex][0] = agentType + agentIndex + agendUniqueId;
+                        data[agentIndex][0] = agentType + agentIndex + "." + agendUniqueId;
                         data[agentIndex][1] = 0; // Wins
                         data[agentIndex][2] = 0; // Lose
                         data[agentIndex][3] = 0; // Draw
@@ -473,7 +493,7 @@ public class MainAgent extends Agent {
 
                         try {
                             getContainerController()
-                                    .createNewAgent(agentType + agentIndex + agendUniqueId, "src.agents." + agentType,
+                                    .createNewAgent(agentType + agentIndex +"." + agendUniqueId, "src.agents." + agentType,
                                             null)
                                     .start();
                             // unique ID para evitar colisiones en los mensajes mandados a agentes que se
@@ -481,7 +501,7 @@ public class MainAgent extends Agent {
 
                             playerAgents.add(
                                     new PlayerInformation(
-                                            new AID(agentType + agentIndex + agendUniqueId++, AID.ISLOCALNAME),
+                                            new AID(agentType + agentIndex +"." + agendUniqueId++, AID.ISLOCALNAME),
                                             agentIndex));
                             agentIndex++;
                         } catch (Exception e) {
@@ -538,17 +558,16 @@ public class MainAgent extends Agent {
 
     private void quitGame() {
         gameRunning = false;
-        processGameOver(); // para que no peten los mensajes
-
+        
         if (gameThread != null && gameThread.isAlive()) {
             gameThread.interrupt();
             gameThread = null;
         }
-
+        
+        processGameOver(); // para que no peten los mensajes
         currentRound = 0;
         stopAtRound = 0;
         // grafico
-        view.appendLog("Game finished", false);
 
         view.newGameButton.setEnabled(true);
         view.quitGameButton.setEnabled(false);
@@ -588,6 +607,7 @@ public class MainAgent extends Agent {
         }
         playerAgents.clear();
         view.stopButton.setEnabled(false); // por algun motivo se queda activado, desactivar otra vez
+        view.newGameButton.setEnabled(true); // idem
     }
 
     private void resetStats() {
@@ -633,9 +653,29 @@ public class MainAgent extends Agent {
                     int row = view.table.rowAtPoint(e.getPoint());
                     int col = view.table.columnAtPoint(e.getPoint());
                     if (row >= 0 && col >= 0) {
+                        // delete
                         if (col == 7) {
                             String agentName = (String) view.statsTableModel.getValueAt(row, 0);
                             deleteAgent(agentName);
+                        }
+                        // last actions
+                        else if (col == 6) {
+                            PlayerInformation player = playerAgents.get(row);
+                            ArrayList<String> lastActionsList = player.getLastActionsList();
+                            if (lastActionsList.size() > 0) {
+                                JTextArea textArea = new JTextArea();
+                                JScrollPane scrollPane = new JScrollPane(textArea);
+                                textArea.setEditable(false);
+                                for (String action : lastActionsList) {
+                                    textArea.append(action + "\n");
+                                }
+
+                                JFrame frame = new JFrame("Action History for " + player.aid.getLocalName());
+                                frame.setSize(300, 200);
+                                frame.add(scrollPane);
+                                frame.setLocationRelativeTo(null);
+                                frame.setVisible(true);
+                            }
                         }
                     }
                 }
@@ -725,7 +765,7 @@ public class MainAgent extends Agent {
         }
     }
 
-    public static class PlayerInformation {
+    public static class PlayerInformation implements Comparable<PlayerInformation> {
         AID aid;
         int id;
         private int wins;
@@ -734,6 +774,19 @@ public class MainAgent extends Agent {
         private float money;
         private float assets;
         private String lastActions = "";
+        private ArrayList<String> lastActionsList = new ArrayList<String>();
+
+        public ArrayList<String> getLastActionsList() {
+            return lastActionsList;
+        }
+
+        public void setLastActionsList(ArrayList<String> lastActionsList) {
+            this.lastActionsList = lastActionsList;
+        }
+
+        public void addLastActionList(String action) {
+            this.lastActionsList.add(action);
+        }
 
         public String getLastActions() {
             return lastActions;
@@ -801,6 +854,15 @@ public class MainAgent extends Agent {
         @Override
         public boolean equals(Object o) {
             return aid.equals(o);
+        }
+
+        @Override
+        public int compareTo(PlayerInformation other) {
+            float thisTotal = this.money
+                    + (this.assets * getIndexValue(currentRound) * (1 - (float) gameParameters.S / 100));
+            float otherTotal = other.money
+                    + (other.assets * getIndexValue(currentRound) * (1 - (float) gameParameters.S / 100));
+            return Float.compare(thisTotal, otherTotal);
         }
     }
 }
