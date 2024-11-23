@@ -235,6 +235,7 @@ public class MainAgent extends Agent {
             float assetPrice = getIndexValue(currentRound);
             String content = "RoundOver#" + player.id + "#" + totalRoundPayoff + "#" + totalMoney + "#"
                     + getInflationRate(currentRound) + "#" + totalAssets + "#" + assetPrice;
+            view.appendLog(content, false);
             roundOverMsg.setContent(content);
             roundOverMsg.addReceiver(player.aid);
             send(roundOverMsg);
