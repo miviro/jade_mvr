@@ -263,9 +263,6 @@ public class MainAgent extends Agent {
                                     break;
                                 }
                             }
-                            // TODO: mejor verbose
-                            // TODO: actualizar README
-                            // TODO: cambiar organizacion package
                             if (player != null) {
                                 if ("Buy".equalsIgnoreCase(action)) {
                                     if (player.getMoney() >= (amount * getIndexValue(currentRound))) {
