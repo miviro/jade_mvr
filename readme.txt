@@ -2,7 +2,8 @@ This is an implementation of a GUI and Main Agent model to simulate tournaments 
 
 Additional functionalities:
     - Clicking on the Last Actions cell of an agent will open its game history.
-    - Dynamic agent creation and destruction, no need to relaunch the 
+    - Dynamic agent creation and destruction, no need to relaunch the program.
+    - Real time stat updates.
 
 Folder structure:
 jade_mvr/
@@ -22,13 +23,21 @@ jade_mvr/
         └── GUI.java
 
 To compile:
-    javac --release 17 -d bin/ -cp lib/* src/agents/*.java src/jade_mvr/*.java
+    Windows:
+        javac --release 17 -d bin/ -cp lib/* src/agents/*.java src/jade_mvr/*.java
+    Linux/Mac:
+        javac --release 17 -d bin/ -cp "lib/*" src/agents/*.java src/jade_mvr/*.java
+
 To execute:
-    java -cp "lib/*:bin/" jade.Boot -notmp -gui -agents "MainAgent:src.jade_mvr.MainAgent;"
+    Windows:
+        java -classpath "lib/*;bin/" jade.Boot -notmp -gui -agents "MainAgent:src.jade_mvr.MainAgent; "
+    Linux/Mac:
+        java -classpath "lib/*:bin/" jade.Boot -notmp -gui -agents "MainAgent:src.jade_mvr.MainAgent; "
 
 Notes:
     - Execute commands in the jade_mvr folder.
     - We only run the MainAgent, which will be in charge of starting and killing new agents as requested by the user.
     - Agents participating in the tournaments should have its .java file placed on the src/agents/ folder.
+    - Java 17 is required.
 
 Miguel Vila Rodríguez, 11-2024
