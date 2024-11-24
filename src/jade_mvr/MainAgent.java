@@ -225,9 +225,7 @@ public class MainAgent extends Agent {
         // round money adjusted for inflation]#[inflation rate, decimal]#[total player
         // owned assets]#[asset individual price] to all players
         for (PlayerInformation player : playerAgents) {
-            float moneyWithInflation = player.getMoney() * (1 - getInflationRate(currentRound)); // TODO: aplicar antes o despues de la ronda la inflacion?
-            player.setMoney(moneyWithInflation);
-
+            // TODO: ida y vuelta o solo una partida entre dos jugadores?
             ACLMessage roundOverMsg = new ACLMessage(ACLMessage.REQUEST);
             float totalRoundPayoff = player.getCurrentRoundMoney(); 
             float totalMoney = player.getMoney();
@@ -235,7 +233,7 @@ public class MainAgent extends Agent {
             float assetPrice = getIndexValue(currentRound);
             String content = "RoundOver#" + player.id + "#" + totalRoundPayoff + "#" + totalMoney + "#"
                     + getInflationRate(currentRound) + "#" + totalAssets + "#" + assetPrice;
-            view.appendLog(content, false);
+            view.appendLog(content, true);
             roundOverMsg.setContent(content);
             roundOverMsg.addReceiver(player.aid);
             send(roundOverMsg);
@@ -316,6 +314,12 @@ public class MainAgent extends Agent {
             accountingMsg.addReceiver(player.aid);
             send(accountingMsg);
         }
+
+        // Apply inflation to each player's money
+        for (PlayerInformation player : playerAgents) {
+            float moneyWithInflation = player.getMoney() * (1 - getInflationRate(currentRound)); // TODO: aplicar antes o despues de la ronda la inflacion?
+            player.setMoney(moneyWithInflation);
+        }
     }
 
     private void playRound() {
@@ -339,6 +343,7 @@ public class MainAgent extends Agent {
 
                 player1.addLastActionList(gameInfo.resultContent);
                 player2.addLastActionList(gameInfo.resultContent);
+                view.appendLog(gameInfo.resultContent, true);
 
                 player1.setMoney(player1.getMoney() + gameInfo.player1Reward);
                 player2.setMoney(player2.getMoney() + gameInfo.player2Reward);

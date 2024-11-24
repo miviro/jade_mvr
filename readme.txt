@@ -1,14 +1,34 @@
+This is an implementation of a GUI and Main Agent model to simulate tournaments of the Steal-Split game between agents.
 
-This is a set of basic commands to compile and execute the code:
+Additional functionalities:
+    - Clicking on the Last Actions cell of an agent will open its game history.
+    - Dynamic agent creation and destruction, no need to relaunch the 
 
-Linux & Mac:
-- To compile: javac -cp .:jade.jar *.java
-- To execute: java -cp .:jade.jar jade.Boot -notmp -gui -agents "MainAgent:MainAgent;RandomAgent:RandomAgent;"
+Folder structure:
+jade_mvr/
+│
+├── lib/
+│   └── jade.jar
+│
+├── bin/
+│
+└── src/
+    ├── agents/
+    │   ├── Agent1.java
+    │   ├── Agent2.java
+    │   └── Agent3.java
+    └── jade_mvr/
+        ├── MainAgent.java
+        └── GUI.java
 
+To compile:
+    javac --release 17 -d bin/ -cp lib/* src/agents/*.java src/jade_mvr/*.java
+To execute:
+    java -cp "lib/*:bin/" jade.Boot -notmp -gui -agents "MainAgent:src.jade_mvr.MainAgent;"
 
-Windows (do not use the PowerShell):
-- To compile: javac -cp lib/jade.jar src/*.java
-- To execute: java -cp lib/jade.jar jade.Boot -notmp -gui -agents "MainAgent:MainAgent;RandomAgent:RandomAgent;"
+Notes:
+    - Execute commands in the jade_mvr folder.
+    - We only run the MainAgent, which will be in charge of starting and killing new agents as requested by the user.
+    - Agents participating in the tournaments should have its .java file placed on the src/agents/ folder.
 
-
-* Note that you need to have the "jade.jar" library in the present folder
+Miguel Vila Rodríguez, 11-2024
