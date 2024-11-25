@@ -52,7 +52,7 @@ public class RandomAgent extends Agent {
         }
 
         System.out.println("RandomPlayer " + getAID().getName() + " terminating.");
-        // TODO: NUNCA PONER SYSTEM.EXIT(0) AQUI!!!!!!!!!!!!!!!!!!!
+        System.exit(0);
     }
 
     private enum State {
@@ -119,6 +119,7 @@ public class RandomAgent extends Agent {
                         } else if (msg.getPerformative() == ACLMessage.INFORM
                                 && msg.getContent().startsWith("GameOver")) {
                             System.out.println("Game Over " + getAID().getName());
+                            takeDown();
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
                         }

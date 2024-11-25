@@ -26,7 +26,6 @@ import java.awt.Component;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 
-// TODO: make configuration panel resizable
 public class MainAgent extends Agent {
     private static GUI view;
     private static GameParametersStruct gameParameters = new GameParametersStruct();;
@@ -539,14 +538,36 @@ public class MainAgent extends Agent {
     }
 
     public void deleteAgent(String agentName) {
-        try {
+        // Send GameOver message
+        PlayerInformation playerDeleted = null;
+
+        for (PlayerInformation p : playerAgents) {
+            if (p.aid.getLocalName().equals(agentName)) {
+                playerDeleted = p;
+                break;
+            }
+        }
+
+        float assetsValue = playerDeleted.getAssets() * getIndexValue(currentRound);
+        float totalPayoff = playerDeleted.getMoney() + assetsValue;
+        float fee = assetsValue * ((float) gameParameters.S / 100);
+        totalPayoff -= fee;
+        playerDeleted.setMoney(totalPayoff);
+
+        ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+        msg.setContent("GameOver#" + playerDeleted.id + "#" + totalPayoff);
+        msg.addReceiver(playerDeleted.aid);
+        send(msg);
+
+        // que se maten ellos solos, pasamos a ignorarlos solamente
+        /*try {
             getContainerController().getAgent(agentName).kill();
         } catch (StaleProxyException e) {
             view.appendLog("Could not kill agent " + agentName + ": " + e.getMessage(), true);
         } catch (ControllerException e) {
             view.appendLog("Could not kill agent " + agentName + ": " + e.getMessage(), true);
             e.printStackTrace();
-        }
+        }*/
         playerAgents.removeIf(player -> player.aid.getLocalName().equals(agentName));
         // Rebuild the table with the updated playerAgents list
         Object[][] data = new Object[playerAgents.size()][8];
@@ -592,8 +613,8 @@ public class MainAgent extends Agent {
         // Remove all entries from the table
         view.updateStatsTable(new Object[0][8]);
 
-        // Kill all agents
-        DFAgentDescription template = new DFAgentDescription();
+        // TODO: Kill all agents
+        /*DFAgentDescription template = new DFAgentDescription();
         ServiceDescription sd = new ServiceDescription();
         sd.setType("Player");
         template.addServices(sd);
@@ -612,7 +633,7 @@ public class MainAgent extends Agent {
             }
         } catch (FIPAException fe) {
             view.appendLog(fe.getMessage(), true);
-        }
+        }*/
         playerAgents.clear();
         view.stopButton.setEnabled(false); // por algun motivo se queda activado, desactivar otra vez
         view.newGameButton.setEnabled(true); // idem
