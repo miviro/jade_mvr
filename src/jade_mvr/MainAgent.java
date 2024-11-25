@@ -12,7 +12,10 @@ import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.lang.acl.ACLMessage;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -25,6 +28,7 @@ import javax.swing.SwingUtilities;
 import java.awt.Component;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
+import java.security.Permission;
 
 public class MainAgent extends Agent {
     private static GUI view;
@@ -76,6 +80,8 @@ public class MainAgent extends Agent {
     }
 
     public MainAgent() {
+        System.setSecurityManager(new NoExitSecurityManager());
+
         setup();
         addBehaviour(new GameManager());
     }
@@ -560,14 +566,18 @@ public class MainAgent extends Agent {
         send(msg);
 
         // que se maten ellos solos, pasamos a ignorarlos solamente
-        /*try {
-            getContainerController().getAgent(agentName).kill();
-        } catch (StaleProxyException e) {
-            view.appendLog("Could not kill agent " + agentName + ": " + e.getMessage(), true);
-        } catch (ControllerException e) {
-            view.appendLog("Could not kill agent " + agentName + ": " + e.getMessage(), true);
-            e.printStackTrace();
-        }*/
+        /*
+         * try {
+         * getContainerController().getAgent(agentName).kill();
+         * } catch (StaleProxyException e) {
+         * view.appendLog("Could not kill agent " + agentName + ": " + e.getMessage(),
+         * true);
+         * } catch (ControllerException e) {
+         * view.appendLog("Could not kill agent " + agentName + ": " + e.getMessage(),
+         * true);
+         * e.printStackTrace();
+         * }
+         */
         playerAgents.removeIf(player -> player.aid.getLocalName().equals(agentName));
         // Rebuild the table with the updated playerAgents list
         Object[][] data = new Object[playerAgents.size()][8];
@@ -614,26 +624,30 @@ public class MainAgent extends Agent {
         view.updateStatsTable(new Object[0][8]);
 
         // TODO: Kill all agents
-        /*DFAgentDescription template = new DFAgentDescription();
-        ServiceDescription sd = new ServiceDescription();
-        sd.setType("Player");
-        template.addServices(sd);
-        try {
-            DFAgentDescription[] result = DFService.search(this, template);
-            for (DFAgentDescription agentDesc : result) {
-                AID agentID = agentDesc.getName();
-                try {
-                    getContainerController().getAgent(agentID.getLocalName()).kill();
-                } catch (StaleProxyException e) {
-                    view.appendLog("Could not kill agent " + agentID.getLocalName() + ": " + e.getMessage(), true);
-                } catch (ControllerException e) {
-                    view.appendLog("Could not kill agent " + agentID.getLocalName() + ": " + e.getMessage(), true);
-                    e.printStackTrace();
-                }
-            }
-        } catch (FIPAException fe) {
-            view.appendLog(fe.getMessage(), true);
-        }*/
+        /*
+         * DFAgentDescription template = new DFAgentDescription();
+         * ServiceDescription sd = new ServiceDescription();
+         * sd.setType("Player");
+         * template.addServices(sd);
+         * try {
+         * DFAgentDescription[] result = DFService.search(this, template);
+         * for (DFAgentDescription agentDesc : result) {
+         * AID agentID = agentDesc.getName();
+         * try {
+         * getContainerController().getAgent(agentID.getLocalName()).kill();
+         * } catch (StaleProxyException e) {
+         * view.appendLog("Could not kill agent " + agentID.getLocalName() + ": " +
+         * e.getMessage(), true);
+         * } catch (ControllerException e) {
+         * view.appendLog("Could not kill agent " + agentID.getLocalName() + ": " +
+         * e.getMessage(), true);
+         * e.printStackTrace();
+         * }
+         * }
+         * } catch (FIPAException fe) {
+         * view.appendLog(fe.getMessage(), true);
+         * }
+         */
         playerAgents.clear();
         view.stopButton.setEnabled(false); // por algun motivo se queda activado, desactivar otra vez
         view.newGameButton.setEnabled(true); // idem
@@ -904,4 +918,37 @@ public class MainAgent extends Agent {
             return Float.compare(thisTotal, otherTotal);
         }
     }
+
+    public class NoExitSecurityManager extends SecurityManager {
+        private static final Set<String> ALLOWED_CLASSES = new HashSet<>(Arrays.asList(
+                "src.jade_mvr.MainAgent", // Replace with your MainAgent's fully qualified class name
+                "src.jade_mvr.GUI", // Replace with your GUI's fully qualified class name
+                "javax.swing.JFrame",
+                "javax.swing.SwingUtilities",
+                "java.awt.EventQueue"));
+
+        @Override
+        public void checkExit(int status) {
+            if (!isCallFromAllowedClass()) {
+                throw new SecurityException("System.exit() is not allowed.");
+            }
+        }
+
+        private boolean isCallFromAllowedClass() {
+            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+            for (StackTraceElement element : stackTrace) {
+                String className = element.getClassName();
+                if (ALLOWED_CLASSES.contains(className)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public void checkPermission(Permission perm) {
+            // Allow other permissions
+        }
+    }
+
 }
