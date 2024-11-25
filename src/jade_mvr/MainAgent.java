@@ -26,6 +26,8 @@ import java.awt.Component;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 
+// TODO: make configuration panel resizable
+// TODO: partidas solo "de ida" 
 public class MainAgent extends Agent {
     private static GUI view;
     private static GameParametersStruct gameParameters = new GameParametersStruct();;
@@ -225,9 +227,8 @@ public class MainAgent extends Agent {
         // round money adjusted for inflation]#[inflation rate, decimal]#[total player
         // owned assets]#[asset individual price] to all players
         for (PlayerInformation player : playerAgents) {
-            // TODO: ida y vuelta o solo una partida entre dos jugadores?
             ACLMessage roundOverMsg = new ACLMessage(ACLMessage.REQUEST);
-            float totalRoundPayoff = player.getCurrentRoundMoney(); 
+            float totalRoundPayoff = player.getCurrentRoundMoney();
             float totalMoney = player.getMoney();
             float totalAssets = player.getAssets();
             float assetPrice = getIndexValue(currentRound);
@@ -263,9 +264,6 @@ public class MainAgent extends Agent {
                                     break;
                                 }
                             }
-                            // TODO: mejor verbose
-                            // TODO: actualizar README
-                            // TODO: cambiar organizacion package
                             if (player != null) {
                                 if ("Buy".equalsIgnoreCase(action)) {
                                     if (player.getMoney() >= (amount * getIndexValue(currentRound))) {
@@ -317,7 +315,7 @@ public class MainAgent extends Agent {
 
         // Apply inflation to each player's money
         for (PlayerInformation player : playerAgents) {
-            float moneyWithInflation = player.getMoney() * (1 - getInflationRate(currentRound)); // TODO: aplicar antes o despues de la ronda la inflacion?
+            float moneyWithInflation = player.getMoney() * (1 - getInflationRate(currentRound));
             player.setMoney(moneyWithInflation);
         }
     }
