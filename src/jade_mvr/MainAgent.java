@@ -621,7 +621,6 @@ public class MainAgent extends Agent {
         // Remove all entries from the table
         view.updateStatsTable(new Object[0][8]);
 
-        // TODO: Kill all agents
         /*
          * DFAgentDescription template = new DFAgentDescription();
          * ServiceDescription sd = new ServiceDescription();
