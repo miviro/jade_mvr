@@ -3,8 +3,6 @@ package src.jade_mvr;
 import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.SimpleBehaviour;
-import jade.wrapper.ControllerException;
-import jade.wrapper.StaleProxyException;
 import jade.domain.DFService;
 import jade.domain.FIPAException;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
