@@ -175,12 +175,22 @@ public class GUI extends JFrame {
         JSpinner nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 100000, 1));
         JSpinner sSpinner = new JSpinner(new SpinnerNumberModel(params.S, 0, 10000, 1));
         JSpinner rSpinner = new JSpinner(new SpinnerNumberModel(params.R, 1, 100000, 1));
-        parametersPanel.add(new JLabel("Number of players (N):"));
-        parametersPanel.add(nSpinner);
-        parametersPanel.add(new JLabel("Stock exchange fee (S%):"));
-        parametersPanel.add(sSpinner);
-        parametersPanel.add(new JLabel("Number of rounds (R):"));
-        parametersPanel.add(rSpinner);
+        
+        JPanel nPanel = new JPanel(new GridLayout(2, 1));
+        nPanel.add(new JLabel("Number of players (N):"));
+        nPanel.add(nSpinner);
+        
+        JPanel sPanel = new JPanel(new GridLayout(2, 1));
+        sPanel.add(new JLabel("Stock exchange fee (S%):"));
+        sPanel.add(sSpinner);
+        
+        JPanel rPanel = new JPanel(new GridLayout(2, 1));
+        rPanel.add(new JLabel("Number of rounds (R):"));
+        rPanel.add(rSpinner);
+        
+        parametersPanel.add(nPanel);
+        parametersPanel.add(sPanel);
+        parametersPanel.add(rPanel);
 
         ChangeListener updateListener = e -> {
             try {

@@ -27,7 +27,6 @@ import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 
 // TODO: make configuration panel resizable
-// TODO: partidas solo "de ida" 
 public class MainAgent extends Agent {
     private static GUI view;
     private static GameParametersStruct gameParameters = new GameParametersStruct();;
