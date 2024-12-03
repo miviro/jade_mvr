@@ -564,18 +564,6 @@ public class MainAgent extends Agent {
         send(msg);
 
         // que se maten ellos solos, pasamos a ignorarlos solamente
-        /*
-         * try {
-         * getContainerController().getAgent(agentName).kill();
-         * } catch (StaleProxyException e) {
-         * view.appendLog("Could not kill agent " + agentName + ": " + e.getMessage(),
-         * true);
-         * } catch (ControllerException e) {
-         * view.appendLog("Could not kill agent " + agentName + ": " + e.getMessage(),
-         * true);
-         * e.printStackTrace();
-         * }
-         */
         playerAgents.removeIf(player -> player.aid.getLocalName().equals(agentName));
         // Rebuild the table with the updated playerAgents list
         Object[][] data = new Object[playerAgents.size()][8];
@@ -621,30 +609,6 @@ public class MainAgent extends Agent {
         // Remove all entries from the table
         view.updateStatsTable(new Object[0][8]);
 
-        /*
-         * DFAgentDescription template = new DFAgentDescription();
-         * ServiceDescription sd = new ServiceDescription();
-         * sd.setType("Player");
-         * template.addServices(sd);
-         * try {
-         * DFAgentDescription[] result = DFService.search(this, template);
-         * for (DFAgentDescription agentDesc : result) {
-         * AID agentID = agentDesc.getName();
-         * try {
-         * getContainerController().getAgent(agentID.getLocalName()).kill();
-         * } catch (StaleProxyException e) {
-         * view.appendLog("Could not kill agent " + agentID.getLocalName() + ": " +
-         * e.getMessage(), true);
-         * } catch (ControllerException e) {
-         * view.appendLog("Could not kill agent " + agentID.getLocalName() + ": " +
-         * e.getMessage(), true);
-         * e.printStackTrace();
-         * }
-         * }
-         * } catch (FIPAException fe) {
-         * view.appendLog(fe.getMessage(), true);
-         * }
-         */
         playerAgents.clear();
         view.stopButton.setEnabled(false); // por algun motivo se queda activado, desactivar otra vez
         view.newGameButton.setEnabled(true); // idem
