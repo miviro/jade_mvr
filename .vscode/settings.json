@@ -1,6 +1,8 @@
 {
     "java.project.referencedLibraries": [
-        "lib/jade.jar",
-        "lib/flatlaf.jar",
+        "/home/miviro/Projects/jade_mvr/lib/jade.jar"
+    ],
+    "java.project.sourcePaths": [
+        "."
     ]
 }

@@ -173,11 +173,13 @@ public class RL_Agent extends Agent {
         }
 
         public void receiveAccounting(ACLMessage msg) {
-            throw new UnsupportedOperationException("Unimplemented method 'receiveAccounting'");
+            // throw new UnsupportedOperationException("Unimplemented method
+            // 'receiveAccounting'");
         }
 
         public void performWaitResults(ACLMessage msg) {
-            throw new UnsupportedOperationException("Unimplemented method 'performWaitResults'");
+            // throw new UnsupportedOperationException("Unimplemented method
+            // 'performWaitResults'");
         }
 
         // Id#[ID]#[N],[R],[S]
@@ -203,6 +205,7 @@ public class RL_Agent extends Agent {
             myId = tMyId;
             return true;
         }
+
         // NewGame#[ID0]#[ID1]
         public boolean validateNewGame(String msgContent) {
             String[] parts = msgContent.split("#");

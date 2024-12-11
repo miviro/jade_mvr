@@ -39,6 +39,5 @@ Notes:
     - We only run the MainAgent, which will be in charge of starting and killing new agents as requested by the user.
     - Agents participating in the tournaments should have its .java file placed on the src/agents/ folder.
     - Java 17 is required.
-    - It is important Agents do not run System.exit(0) when they quit, or else the program will quit on Quit Game.
 
 Miguel Vila Rodríguez, 11-2024
