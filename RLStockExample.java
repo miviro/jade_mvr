@@ -21,11 +21,15 @@ public class RLStockExample {
     // Parameters
     private static final double ALPHA = 0.01; // Decreased learning rate
     private static final double GAMMA = 0.95; // Increased discount factor
-    private static final int STATE_SIZE = 3; // Number of discrete states
+    private static final int STATE_SIZE = Momentum.values().length * MoneyState.values().length
+            * StockState.values().length; // Number of discrete states
 
     private double epsilon = 1.0; // Start with high exploration rate
     private double minEpsilon = 0.01;
-    private double epsilonDecay = 0.999;
+    private double epsilonDecay = 0.995;
+
+    private float inflationRate = 0.02f; // Example inflation rate
+    private float commissionFee = 0.01f; // Example commission fee
 
     // Q-Table
     private double[][] Q;
@@ -47,41 +51,95 @@ public class RLStockExample {
         this.random = new Random();
     }
 
-    // Calculate momentum as additional state feature
-    private float calculateMomentum(int t) {
-        if (t == 0)
-            return 0.0f;
-        return stockPrices.get(t) - stockPrices.get(t - 1);
+    enum Momentum {
+        UP, DOWN, STABLE
     }
 
-    // Discretize the stock price into states using momentum
-    private int getState(int t, float currentPrice, float prevPrice, float movingAverage) {
-        float momentum = calculateMomentum(t);
-        if (momentum > 0) {
-            return 0; // Bullish trend
-        } else if (momentum < 0) {
-            return 1; // Bearish trend
+    private static final double PRICE_CHANGE_THRESHOLD = 0.01; // 1% threshold for significant price change
+
+    // Calculate momentum as additional state feature
+    private Momentum calculateMomentum(int t) {
+        if (t == 0) {
+            return Momentum.STABLE;
+        }
+        float currentPrice = stockPrices.get(t);
+        float prevPrice = stockPrices.get(t - 1);
+        float priceChange = (currentPrice - prevPrice) / prevPrice; // Calculate percentage change
+
+        if (Math.abs(priceChange) < PRICE_CHANGE_THRESHOLD) {
+            return Momentum.STABLE;
+        } else if (priceChange > 0) {
+            return Momentum.UP;
         } else {
-            return 2; // Sideways
+            return Momentum.DOWN;
         }
     }
 
-    // Choose action using epsilon-greedy policy
-    private Action chooseAction(int state) {
+    public enum MoneyState {
+        CAN_AFFORD,
+        CANNOT_AFFORD
+    }
+
+    public enum StockState {
+        CAN_SELL,
+        CANNOT_SELL
+    }
+
+    private MoneyState getMoneyState(float currentPrice) {
+        return (money >= currentPrice) ? MoneyState.CAN_AFFORD : MoneyState.CANNOT_AFFORD;
+    }
+
+    private StockState getStockState() {
+        return (numStocks > 0) ? StockState.CAN_SELL : StockState.CANNOT_SELL;
+    }
+
+    private int getState(int t, float currentPrice, float prevPrice, float movingAverage) {
+        Momentum momentum = calculateMomentum(t);
+        MoneyState moneyState = getMoneyState(currentPrice);
+        StockState stockState = getStockState();
+
+        // Combine states into single integer
+        return momentum.ordinal() * (MoneyState.values().length * StockState.values().length) +
+                moneyState.ordinal() * StockState.values().length +
+                stockState.ordinal();
+    }
+
+    // Choose action using epsilon-greedy policy with validity check
+    private Action chooseAction(int state, float currentPrice) {
         if (random.nextDouble() < epsilon) {
-            // Exploration
-            return Action.values()[random.nextInt(Action.values().length)];
+            // Exploration with valid actions only
+            ArrayList<Action> validActions = new ArrayList<>();
+            for (Action a : Action.values()) {
+                if (isValidAction(a, currentPrice)) {
+                    validActions.add(a);
+                }
+            }
+            return validActions.get(random.nextInt(validActions.size()));
         } else {
-            // Exploitation
+            // Exploitation with valid actions only
             double maxQ = Double.NEGATIVE_INFINITY;
             Action bestAction = Action.HOLD;
             for (Action action : Action.values()) {
-                if (Q[state][action.ordinal()] > maxQ) {
+                if (isValidAction(action, currentPrice) && Q[state][action.ordinal()] > maxQ) {
                     maxQ = Q[state][action.ordinal()];
                     bestAction = action;
                 }
             }
             return bestAction;
+        }
+    }
+
+    // Helper method to check if an action is valid
+    private boolean isValidAction(Action action, float price) {
+        switch (action) {
+            case BUY:
+                return money >= price;
+            case SELL:
+                return numStocks > 0;
+            case HOLD:
+                return true;
+            default:
+                return false;
         }
     }
 
@@ -101,34 +159,59 @@ public class RLStockExample {
     private double executeAction(Action action, float price, int t) {
         float futurePrice = (t + 1 < stockPrices.size()) ? stockPrices.get(t + 1) : price;
 
+        float initialMoney = money;
+        float initialStocks = numStocks;
+        float currentTotalAsset = money + numStocks * price;
+
+        // Calculate future assets only for valid actions
+        ArrayList<Float> possibleFutureAssets = new ArrayList<>();
+
+        // Always add HOLD scenario
+        possibleFutureAssets.add(initialMoney + initialStocks * futurePrice);
+
+        // Only add BUY scenario if we can afford it
+        if (initialMoney >= price) {
+            float buyFutureAsset = (initialMoney - price) + (initialStocks + 1) * futurePrice;
+            possibleFutureAssets.add(buyFutureAsset);
+        }
+
+        // Only add SELL scenario if we have stocks
+        if (initialStocks > 0) {
+            // Add SELL scenario with commission fee
+            float sellPrice = price * (1.0f - commissionFee); // Apply commission fee
+            possibleFutureAssets.add((initialMoney + sellPrice) + (initialStocks - 1) * futurePrice);
+        }
+
+        // Find best possible future asset among valid actions
+        float bestFutureAsset = possibleFutureAssets.stream()
+                .max(Float::compareTo)
+                .orElse(currentTotalAsset);
+
+        // Execute the chosen action (which we know is valid due to chooseAction checks)
         switch (action) {
             case BUY:
-                if (money >= price) {
-                    money -= price;
-                    numStocks += 1.0f;
-                } else {
-                    return -1.0; // Penalty for invalid action
-                }
+                money -= price;
+                numStocks += 1.0f;
                 break;
             case SELL:
-                if (numStocks > 0) {
-                    money += price;
-                    numStocks -= 1.0f;
-                } else {
-                    return -1.0;
-                }
+                money += price * (1.0f - commissionFee); // Apply commission fee when selling
+                numStocks -= 1.0f;
                 break;
             case HOLD:
-                // No transaction
                 break;
         }
 
-        // Calculate the change in total assets
-        float currentTotalAsset = money + numStocks * price;
-        float futureTotalAsset = money + numStocks * futurePrice;
+        money -= inflationRate * money;
 
-        // Reward is the difference between future and current total assets
-        return futureTotalAsset - currentTotalAsset;
+        float actualFutureAsset = money + numStocks * futurePrice;
+
+        // If the chosen action was the best possible, return natural profit
+        if (Math.abs(actualFutureAsset - bestFutureAsset) < 0.001) {
+            return actualFutureAsset - currentTotalAsset;
+        }
+        // Otherwise return the difference between actual and best possible valid
+        // outcome
+        return actualFutureAsset - bestFutureAsset;
     }
 
     public void train(int episodes) {
@@ -143,7 +226,7 @@ public class RLStockExample {
                 float currentPrice = stockPrices.get(t);
                 float prevPrice = stockPrices.get((t == 0) ? 0 : t - 1);
                 int state = getState(t, currentPrice, prevPrice, movingAverage);
-                Action action = chooseAction(state);
+                Action action = chooseAction(state, currentPrice);
 
                 // Execute action and get reward based on future price
                 double reward = executeAction(action, currentPrice, t);
@@ -164,6 +247,10 @@ public class RLStockExample {
         }
     }
 
+    private String formatFloat(float value) {
+        return String.format("%06.2f", value);
+    }
+
     public void test() {
         // Testing the trained agent
         money = 1000.0f;
@@ -179,21 +266,28 @@ public class RLStockExample {
             Action action = Action.HOLD;
             double maxQ = Double.NEGATIVE_INFINITY;
             for (Action a : Action.values()) {
-                if (Q[state][a.ordinal()] > maxQ) {
+                if (isValidAction(a, currentPrice) && Q[state][a.ordinal()] > maxQ) {
                     maxQ = Q[state][a.ordinal()];
                     action = a;
                 }
             }
-            System.out.println("Day " + t + ": Price = " + currentPrice + ", Action = " + action);
+            System.out.println(
+                    "Day " + t + ": Price = " + formatFloat(currentPrice) +
+                            ", can_afford: " + (money > stockPrices.get(t)) +
+                            ", can_sell: " + (numStocks > 0) +
+                            ", Momentum: " + calculateMomentum(t) +
+                            ", Action = " + action +
+                            ", Money = " + String.format("%-15s", formatFloat(money)) +
+                            ", Stocks = " + String.format("%-15s", formatFloat(numStocks)));
             double reward = executeAction(action, currentPrice, t);
             totalReward += reward;
         }
 
-        System.out.println("Test Run: Total Reward = " + totalReward);
-        System.out.println("Final Money: $" + money);
-        System.out.println("Final Stocks: " + numStocks);
-
-        System.out.println("Net worth: $" + (money + numStocks * stockPrices.get(stockPrices.size() - 1)));
+        System.out.println("Test Run: Total Reward = " + formatFloat((float) totalReward));
+        System.out.println("Final Money: $" + String.format("%-15s", formatFloat(money)));
+        System.out.println("Final Stocks: " + String.format("%-15s", formatFloat(numStocks)));
+        System.out.println("Net worth: $"
+                + String.format("%-15s", formatFloat(money + numStocks * stockPrices.get(stockPrices.size() - 1))));
     }
 
     public static void main(String[] args) {
@@ -201,31 +295,36 @@ public class RLStockExample {
         ArrayList<Float> stockPrices = new ArrayList<>();
         // Simple synthetic data: sine wave with noise
         for (int i = 0; i < 1000; i++) {
-            stockPrices.add((float) (20 + 10 * Math.sin(i * 0.1)));
+            float price = (float) (50 + 50 * Math.sin(i * 0.05));
+            // Round to 2 decimal places
+            price = Math.round(price * 100.0f) / 100.0f;
+            stockPrices.add(price);
         }
 
         RLStockExample trader = new RLStockExample(stockPrices);
         trader.train(1000); // Train for 1000 episodes
         trader.test(); // Test the trained agent
 
-        // Optionally, print Q-Table
-        System.out.println("Q-Table:");
-        for (int i = 0; i < STATE_SIZE; i++) {
-            switch (i) {
-                case 0:
-                    System.out.print("Subiendo: ");
-                    break;
-                case 1:
-                    System.out.print("Bajando: ");
-                    break;
-                case 2:
-                    System.out.print("Estable: ");
-                    break;
+        // Print Q-Table
+        System.out.println("\nQ-Table:");
+        System.out.printf("%-20s %-10s %-15s %-15s %-10s %-10s %-10s\n", "State", "Momentum", "Money", "Stock", "BUY",
+                "SELL", "HOLD");
+        for (Momentum mom : Momentum.values()) {
+            for (MoneyState money : MoneyState.values()) {
+                for (StockState stock : StockState.values()) {
+                    int state = mom.ordinal() * (MoneyState.values().length * StockState.values().length) +
+                            money.ordinal() * StockState.values().length +
+                            stock.ordinal();
+
+                    System.out.printf("%-20d %-10s %-10s %-10s", state, mom, String.format("%-15s", money),
+                            String.format("%-15s", stock));
+
+                    for (Action action : Action.values()) {
+                        System.out.printf("%-10.2f ", trader.Q[state][action.ordinal()]);
+                    }
+                    System.out.println();
+                }
             }
-            for (Action action : Action.values()) {
-                System.out.print(action + "=" + trader.Q[i][action.ordinal()] + " ");
-            }
-            System.out.println();
         }
     }
 }
