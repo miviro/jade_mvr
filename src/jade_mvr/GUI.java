@@ -33,6 +33,7 @@ public class GUI extends JFrame {
     public JButton playAllRoundsButton;
     public JButton playXRoundsButton;
     public JSpinner playXRoundsSpinner;
+    public JSpinner nSpinner;
     public JLabel playXRoundsLabel;
     public JLabel verboseLabel;
     public JTextArea logTextArea;
@@ -148,7 +149,18 @@ public class GUI extends JFrame {
         knownAgentsPanel.setLayout(new BoxLayout(knownAgentsPanel, BoxLayout.Y_AXIS));
 
         ArrayList<String> agentNames = MainAgent.getAgentTypesList();
-        int totalAgents = MainAgent.getGameParameters().N;
+        GameParametersStruct params = MainAgent.getGameParameters();
+        int totalAgents = params.N;
+
+        // Ensure N is at least equal to number of agent types
+        if (totalAgents < agentNames.size()) {
+            totalAgents = agentNames.size();
+            MainAgent.setGameParameters(new GameParametersStruct(totalAgents, params.R, params.S));
+
+            // Update the nSpinner value
+            nSpinner.setValue(totalAgents);
+        }
+
         int baseAgentsPerType = totalAgents / agentNames.size();
         int remainder = totalAgents % agentNames.size();
 
@@ -158,6 +170,8 @@ public class GUI extends JFrame {
 
             // Last agent gets the remainder
             int defaultValue = (i == agentNames.size() - 1) ? baseAgentsPerType + remainder : baseAgentsPerType;
+            if (defaultValue < 1)
+                defaultValue = 1;
 
             agentPanel.add(new JSpinner(new SpinnerNumberModel(defaultValue, 1, 100, 1)), BorderLayout.EAST);
             knownAgentsPanel.add(agentPanel);
@@ -172,22 +186,22 @@ public class GUI extends JFrame {
 
         // Retrieve current parameters
         GameParametersStruct params = MainAgent.getGameParameters();
-        JSpinner nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 100000, 1));
+        nSpinner = new JSpinner(new SpinnerNumberModel(params.N, 1, 100000, 1));
         JSpinner sSpinner = new JSpinner(new SpinnerNumberModel(params.S, 0, 10000, 1));
         JSpinner rSpinner = new JSpinner(new SpinnerNumberModel(params.R, 1, 100000, 1));
-        
+
         JPanel nPanel = new JPanel(new GridLayout(2, 1));
         nPanel.add(new JLabel("Number of players (N):"));
         nPanel.add(nSpinner);
-        
+
         JPanel sPanel = new JPanel(new GridLayout(2, 1));
         sPanel.add(new JLabel("Stock exchange fee (S%):"));
         sPanel.add(sSpinner);
-        
+
         JPanel rPanel = new JPanel(new GridLayout(2, 1));
         rPanel.add(new JLabel("Number of rounds (R):"));
         rPanel.add(rSpinner);
-        
+
         parametersPanel.add(nPanel);
         parametersPanel.add(sPanel);
         parametersPanel.add(rPanel);

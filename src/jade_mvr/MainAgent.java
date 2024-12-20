@@ -267,6 +267,7 @@ public class MainAgent extends Agent {
                                 }
                             }
                             if (player != null) {
+                                // TODO: comprar por dinero, vender por activos
                                 if ("Buy".equalsIgnoreCase(action)) {
                                     if (player.getMoney() >= (amount * getIndexValue(currentRound))) {
                                         player.setMoney(player.getMoney() - (amount * getIndexValue(currentRound)));
@@ -719,8 +720,12 @@ public class MainAgent extends Agent {
 
     public static void setGameParameters(GameParametersStruct gameParameters) {
         MainAgent.gameParameters = gameParameters;
-        view.appendLog("Parameters set to: N=" + gameParameters.N + ", S=" + gameParameters.S + ", R="
-                + gameParameters.R, true);
+        try {
+            view.appendLog("Parameters set to: N=" + gameParameters.N + ", S=" + gameParameters.S + ", R="
+                    + gameParameters.R, true);
+        } catch (Exception e) {
+            System.out.println("Error setting parameters: " + e.getMessage());
+        }
     }
 
     public static void main(String[] args) {

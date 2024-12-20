@@ -11,7 +11,7 @@ import jade.lang.acl.ACLMessage;
 
 import java.util.Random;
 
-public class RandomAgent extends Agent {
+public class AlwaysCooperateAgent extends Agent {
 
     private State state;
     private AID mainAgent;
@@ -132,7 +132,7 @@ public class RandomAgent extends Agent {
                         if (msg.getPerformative() == ACLMessage.REQUEST && msg.getContent().startsWith("Action")) {
                             ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
                             msg.addReceiver(mainAgent);
-                            msg.setContent("Action#" + getRandomAction());
+                            msg.setContent("Action#C");
                             printColored(getAID().getName() + " sent " + msg.getContent());
                             send(msg);
                             state = State.waitResults;
