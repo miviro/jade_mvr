@@ -267,11 +267,10 @@ public class MainAgent extends Agent {
                                 }
                             }
                             if (player != null) {
-                                // TODO: comprar por dinero, vender por activos
                                 if ("Buy".equalsIgnoreCase(action)) {
-                                    if (player.getMoney() >= (amount * getIndexValue(currentRound))) {
-                                        player.setMoney(player.getMoney() - (amount * getIndexValue(currentRound)));
-                                        player.setAssets(player.getAssets() + amount);
+                                    if (player.getMoney() >= amount) {
+                                        player.setMoney(player.getMoney() - amount);
+                                        player.setAssets(player.getAssets() + (amount / getIndexValue(currentRound)));
                                         view.appendLog("Player " + player.id + " bought " + amount + " assets ", true);
                                     } else {
                                         view.appendLog("Player " + player.id + " tried to buy more than they have.",
