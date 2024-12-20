@@ -150,34 +150,45 @@ public class GUI extends JFrame {
 
         ArrayList<String> agentNames = MainAgent.getAgentTypesList();
         GameParametersStruct params = MainAgent.getGameParameters();
-        int totalAgents = params.N;
 
-        // Ensure N is at least equal to number of agent types
-        if (totalAgents < agentNames.size()) {
-            totalAgents = agentNames.size();
-            MainAgent.setGameParameters(new GameParametersStruct(totalAgents, params.R, params.S));
-
-            // Update the nSpinner value
-            nSpinner.setValue(totalAgents);
-        }
-
-        int baseAgentsPerType = totalAgents / agentNames.size();
-        int remainder = totalAgents % agentNames.size();
+        // Set N to number of agent types (1 agent per type)
+        int totalAgents = agentNames.size();
+        MainAgent.setGameParameters(new GameParametersStruct(totalAgents, params.R, params.S));
+        nSpinner.setValue(totalAgents);
 
         for (int i = 0; i < agentNames.size(); i++) {
             JPanel agentPanel = new JPanel(new BorderLayout());
             agentPanel.add(new JLabel(agentNames.get(i)), BorderLayout.WEST);
 
-            // Last agent gets the remainder
-            int defaultValue = (i == agentNames.size() - 1) ? baseAgentsPerType + remainder : baseAgentsPerType;
-            if (defaultValue < 1)
-                defaultValue = 1;
+            // Default value is 1 for each agent type
+            JSpinner agentSpinner = new JSpinner(new SpinnerNumberModel(1, 0, 100, 1));
+            agentSpinner.addChangeListener(e -> {
+                // Only update when agent counts change
+                int total = getTotalAgentsFromSpinners();
+                nSpinner.setValue(total);
+                MainAgent.setGameParameters(new GameParametersStruct(total, params.R, params.S));
+            });
 
-            agentPanel.add(new JSpinner(new SpinnerNumberModel(defaultValue, 1, 100, 1)), BorderLayout.EAST);
+            agentPanel.add(agentSpinner, BorderLayout.EAST);
             knownAgentsPanel.add(agentPanel);
         }
 
         return knownAgentsPanel;
+    }
+
+    private int getTotalAgentsFromSpinners() {
+        int total = 0;
+        for (Component component : knownAgentsPanel.getComponents()) {
+            if (component instanceof JPanel) {
+                JPanel agentPanel = (JPanel) component;
+                for (Component subComponent : agentPanel.getComponents()) {
+                    if (subComponent instanceof JSpinner) {
+                        total += (Integer) ((JSpinner) subComponent).getValue();
+                    }
+                }
+            }
+        }
+        return total;
     }
 
     private JPanel createParametersPanel() {
@@ -212,12 +223,6 @@ public class GUI extends JFrame {
                 int r = (Integer) rSpinner.getValue();
                 int s = (Integer) sSpinner.getValue();
                 MainAgent.setGameParameters(new GameParametersStruct(n, r, s));
-                // Update known agents panel
-                configPanel.remove(knownAgentsPanel);
-                knownAgentsPanel = createKnownAgentsPanel();
-                configPanel.add(knownAgentsPanel, BorderLayout.SOUTH);
-                configPanel.revalidate();
-                configPanel.repaint();
             } catch (Exception ex) {
                 appendLog("Invalid input for parameters.", false);
                 appendLog(ex.getMessage(), true);
