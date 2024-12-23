@@ -41,9 +41,11 @@ public class MainAgent extends Agent {
 
     private Thread gameThread;
     private volatile boolean gameRunning = false;
+    private long gameStartTime;
+    private long gameEndTime;
 
     private static float getIndexValue(int currentRound) {
-        return (float) 10.00;
+        return (float) (20.00 + 10 * Math.sin(currentRound / 10.0));
     }
 
     private static float getInflationRate(int currentRound) {
@@ -87,6 +89,7 @@ public class MainAgent extends Agent {
     private void startNewGame() {
         currentRound = 0;
         stopAtRound = 0;
+        gameStartTime = System.currentTimeMillis();
         int totalAgents = getTotalAgents();
 
         if (totalAgents != MainAgent.getGameParameters().N) {
@@ -370,9 +373,24 @@ public class MainAgent extends Agent {
         ArrayList<PlayerInformation> sortedPlayers = new ArrayList<>(playerAgents);
         sortedPlayers.sort((a, b) -> b.compareTo(a));
         // añadir 1 a currentRound, mostrar +1 para que empiece en 1
-        view.verboseLabel.setText("Round " + (currentRound++ + 1) + " / " + getGameParameters().R
-                + ", index value: " + getIndexValue(currentRound) + ", inflation rate: "
-                + getInflationRate(currentRound) + ", current winner: " + sortedPlayers.get(0).aid.getLocalName());
+        long currentTime = System.currentTimeMillis();
+        double elapsedSeconds = (currentTime - gameStartTime) / 1000.0;
+        double roundsPerSecond = currentRound / elapsedSeconds;
+
+        view.verboseLabel.setText(String.format(
+                "Round %d/%d, Time: %.1fs (%.1f rounds/s), index: %.2f, inflation: %.2f, leader: %s (%.2f total, %.2f per round)",
+                currentRound + 1,
+                getGameParameters().R,
+                elapsedSeconds,
+                roundsPerSecond,
+                getIndexValue(currentRound),
+                getInflationRate(currentRound),
+                sortedPlayers.get(0).aid.getLocalName(),
+                (sortedPlayers.get(0).getMoney() + sortedPlayers.get(0).getAssets() * getIndexValue(currentRound)),
+                ((sortedPlayers.get(0).getMoney() + sortedPlayers.get(0).getAssets() * getIndexValue(currentRound))
+                        / currentRound)));
+
+        currentRound++;
 
         view.statsTableModel.fireTableDataChanged();
     }
