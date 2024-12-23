@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -274,7 +275,10 @@ public class MainAgent extends Agent {
                                     if (player.getMoney() >= amount) {
                                         player.setMoney(player.getMoney() - amount);
                                         player.setAssets(player.getAssets() + (amount / getIndexValue(currentRound)));
-                                        view.appendLog("Player " + player.id + " bought " + amount + " assets ", true);
+                                        String contentLog = "Player " + player.id + " bought " + amount + " assets ";
+
+                                        view.appendLog(contentLog, true);
+                                        player.addLastActionList(contentLog);
                                     } else {
                                         view.appendLog("Player " + player.id + " tried to buy more than they have.",
                                                 true);
@@ -285,8 +289,9 @@ public class MainAgent extends Agent {
                                         float fee = assetValue * ((float) getGameParameters().S / 100);
                                         player.setAssets(player.getAssets() - amount);
                                         player.setMoney(player.getMoney() + assetValue - fee);
-                                        view.appendLog("Player " + player.id + " sold assets worth " + assetValue,
-                                                true);
+                                        String contentLog = "Player " + player.id + " sold assets worth " + assetValue;
+                                        view.appendLog(contentLog, true);
+                                        player.addLastActionList(contentLog);
                                     } else {
                                         view.appendLog("Player " + player.id + " tried to sell more than they have.",
                                                 true);
@@ -685,16 +690,59 @@ public class MainAgent extends Agent {
                             PlayerInformation player = playerAgents.get(row);
                             ArrayList<String> lastActionsList = player.getLastActionsList();
                             if (lastActionsList.size() > 0) {
+                                JFrame frame = new JFrame("Action History for " + player.aid.getLocalName());
                                 JTextArea textArea = new JTextArea();
                                 JScrollPane scrollPane = new JScrollPane(textArea);
                                 textArea.setEditable(false);
+
+                                // Add filter controls
+                                JPanel controlPanel = new JPanel();
+                                JSpinner opponentSpinner = new JSpinner();
+                                opponentSpinner
+                                        .setModel(new javax.swing.SpinnerNumberModel(0, 0, gameParameters.N - 1, 1));
+                                JButton filterButton = new JButton("Filter by Opponent");
+                                JButton resetButton = new JButton("Show All");
+
+                                controlPanel.add(new JLabel("Opponent ID:"));
+                                controlPanel.add(opponentSpinner);
+                                controlPanel.add(filterButton);
+                                controlPanel.add(resetButton);
+
+                                // Action listeners
+                                filterButton.addActionListener(evt -> {
+                                    int opponentId = (Integer) opponentSpinner.getValue();
+                                    textArea.setText("");
+                                    for (String action : lastActionsList) {
+                                        if (action.startsWith("Round:")) {
+                                            String[] parts = action.split("#");
+                                            if (parts.length > 1) {
+                                                String[] ids = parts[1].split(",");
+                                                if (ids[0].equals(String.valueOf(opponentId)) ||
+                                                        ids[1].equals(String.valueOf(opponentId))) {
+                                                    textArea.append(action + "\n");
+                                                }
+                                            }
+                                        }
+                                    }
+                                });
+
+                                resetButton.addActionListener(evt -> {
+                                    textArea.setText("");
+                                    for (String action : lastActionsList) {
+                                        textArea.append(action + "\n");
+                                    }
+                                });
+
+                                // Initial population
                                 for (String action : lastActionsList) {
                                     textArea.append(action + "\n");
                                 }
 
-                                JFrame frame = new JFrame("Action History for " + player.aid.getLocalName());
-                                frame.setSize(300, 200);
-                                frame.add(scrollPane);
+                                // Layout
+                                frame.setLayout(new java.awt.BorderLayout());
+                                frame.add(controlPanel, java.awt.BorderLayout.NORTH);
+                                frame.add(scrollPane, java.awt.BorderLayout.CENTER);
+                                frame.setSize(400, 300);
                                 frame.setLocationRelativeTo(null);
                                 frame.setVisible(true);
                             }
