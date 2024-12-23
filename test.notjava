@@ -1,0 +1,290 @@
+package src.agents;
+
+import jade.core.Agent;
+import jade.core.behaviours.CyclicBehaviour;
+import jade.lang.acl.ACLMessage;
+import java.util.Random;
+import java.util.Vector;
+import java.util.regex.Pattern;
+import jade.domain.DFService;
+import jade.domain.FIPAAgentManagement.DFAgentDescription;
+import jade.domain.FIPAAgentManagement.ServiceDescription;
+import jade.domain.FIPAException;
+
+public class RL_Agent extends Agent {
+    final double dDecFactorLR = 0.99; // Value that will decrement the learning rate in each generation
+    final double dMINLearnRate = 0.05; // We keep learning, after convergence, during 5% of times
+    boolean bAllActions = false; // At the beginning we did not try all actions
+    int iNumActions = 2;
+    int iNewAction; // Para escoger C o D
+    int iNewStockAction; // Para escoger B o S
+    int iLastAction; // La ultima accion jugada por este jugador
+    int[] iNumTimesAction = new int[iNumActions]; // Numero de veces que una accion ha sido jugada
+    double[] dPayoffAction = new double[iNumActions]; // Accumulated payoff obtained by the different actions
+    double[] dProbAction = new double[iNumActions];
+    StateAction oPresentStateAction; // Contains the present state we are and the actions that are available
+    Vector oVStateActions; // A vector containing strings with the possible States and Actions available at
+                           // each one
+    StateAction oLastStateAction;
+    double dLearnRate = 0.5;
+    int opponentId;
+    int myId;
+
+    protected void setup() {
+        oVStateActions = new Vector(); // Vector<StateAction> oVStateActions = new Vector<>();
+
+        // Se registra como un Agent para que el MainAgent pueda detectarlo
+        DFAgentDescription dfd = new DFAgentDescription();
+        dfd.setName(getAID());
+        ServiceDescription sd = new ServiceDescription();
+        sd.setType("Agent");
+        sd.setName("Game");
+        dfd.addServices(sd);
+        try {
+            DFService.register(this, dfd);
+        } catch (FIPAException fe) {
+            fe.printStackTrace();
+        }
+        System.out.println("RL Agent " + getAID().getLocalName() + " is ready.");
+
+        // Agrega un comportamiento cíclico para responder a mensajes
+        addBehaviour(new CyclicBehaviour() {
+            @Override
+            public void action() {
+                ACLMessage msg = receive();
+                if (msg != null) {
+                    String content = msg.getContent();
+
+                    // Identifica y responde a mensajes del MainAgent
+                    if (content.startsWith("Action")) {
+                        String action;
+                        String currentState = "Opponent" + opponentId;
+                        // Llama al metodo que le va a decir cual es la mejor accion
+                        vGetNewActionAutomata(currentState, iNumActions, 0.0);
+                        // Dependiendo del valor de iNewAction, hará C o D
+                        if (iNewAction == 0) {
+                            action = "C";
+                        } else {
+                            action = "D";
+                        }
+
+                        // Una vez se ha hecho esta accion, pasa a ser la ultima realizada
+                        iLastAction = iNewAction;
+
+                        // Mandar mensaje al MainAgent
+                        ACLMessage reply = msg.createReply();
+                        reply.setPerformative(ACLMessage.INFORM);
+                        reply.setContent("Action#" + action);
+                        send(reply);
+
+                        System.out.println(getLocalName() + " chose action: " + action);
+                    } else if (content.startsWith("Results")) {
+                        // Muestra los resultados de un juego
+                        System.out.println(getLocalName() + " received results: " + content);
+
+                        // Obtenemos los el id del oponente y nuestra recompensa
+                        String[] parts = content.split("#");
+                        String[] parts2 = parts[1].split(",");
+                        String[] partsRew = parts[3].split(",");
+                        int id1 = Integer.parseInt(parts2[0]);
+                        int id2 = Integer.parseInt(parts2[1]);
+                        double reward;
+                        String currentState;
+
+                        if (myId == id1) {
+                            reward = Double.parseDouble(partsRew[0]);
+                            currentState = "Opponent" + id2;
+                        } else {
+                            reward = Double.parseDouble(partsRew[1]);
+                            currentState = "Opponent" + id1;
+                        }
+
+                        // Actualizamos los valores para este estado concreto
+                        vGetNewActionAutomata(currentState, iNumActions, reward);
+                    } else if (content.startsWith("RoundOver")) {
+                        // Muestra los resultados de una ronda
+                        double numero = 0;
+                        System.out.println(getLocalName() + " received round summary: " + content);
+
+                        String action;
+                        // Llama al metodo para que le devuelva en la variable iNewStockAction la mejor
+                        // accion en este caso
+                        vGetNewActionStats();
+                        if (iNewStockAction == 0) {
+                            action = "B";
+                        } else {
+                            action = "S";
+                        }
+                        // Crea el mensaje de respuesta con la acción
+                        ACLMessage reply = msg.createReply();
+                        reply.setPerformative(ACLMessage.INFORM);
+
+                        // Tanto si es para comprar como para vender, escoge un numero aleatorio entre 0
+                        // y
+                        // el maximo que pueda comprar/vender
+                        if (action.equals("B")) {
+                            String separador = Pattern.quote("#");
+                            String[] parts = content.split(separador);
+                            double rew = Double.parseDouble(parts[3]);
+                            if (rew <= 0) {
+                                reply.setContent("Buy#0");
+                            } else {
+                                numero = Math.random() * rew;
+                                numero = Math.round(numero * 100.0) / 100.0;
+                                reply.setContent("Buy#" + numero);
+                            }
+                        } else {
+                            String separador = Pattern.quote("#");
+                            String[] parts = content.split(separador);
+                            double rew = Double.parseDouble(parts[5]);
+                            if (rew == 0) {
+                                reply.setContent("Sell#0");
+                            } else {
+                                numero = Math.random() * rew;
+                                numero = Math.round(numero * 100.0) / 100.0;
+                                reply.setContent("Sell#" + numero);
+                            }
+                        }
+                        send(reply);
+                        System.out.println(getLocalName() + " choose " + action + " " + numero);
+                    } else if (content.startsWith("GameOver")) {
+                        // Al final del torneo, el agente recibe la puntuación final
+                        System.out.println(getLocalName() + " received game over message: " + content);
+                    } else if (content.startsWith("Id")) {
+                        myId = Integer.parseInt(content.split("#")[1]);
+
+                        // Mensaje que recibe al principio de un torneo
+                        System.out.println(getLocalName() + " received message: " + content);
+                    } else if (content.startsWith("Accounting")) {
+                        // Mensaje de las puntuaciones del jugador antes de empezar la siguiente ronda
+                        System.out.println(getLocalName() + " received message: " + content);
+                    } else if (content.startsWith("NewGame")) {
+                        // Mensaje de contra quien va a jugar este juego
+                        System.out.println(getLocalName() + " received message: " + content);
+
+                        // Obtenemos el id del oponente al principio de cada juego
+                        String[] parts = content.split("#");
+                        int id1 = Integer.parseInt(parts[1]);
+                        int id2 = Integer.parseInt(parts[2]);
+
+                        if (myId == id1) {
+                            opponentId = id2;
+                        } else {
+                            opponentId = id1;
+                        }
+                    }
+                } else {
+                    block();
+                }
+            }
+        });
+    }
+
+    public void vGetNewActionStats() {
+        double dAux, dAuxTot;
+        double[] dAvgPayoffAction = new double[iNumActions];
+
+        // Checking that I have played all actions before
+        if (!bAllActions) {
+            bAllActions = true;
+            for (int i = 0; i < iNumActions; i++)
+                if (iNumTimesAction[i] == 0) {
+                    bAllActions = false;
+                    break;
+                }
+        } else { // If all actions have been tested, the probabilities are adjusted
+            dAuxTot = 0;
+            for (int i = 0; i < iNumActions; i++) { // Calculating average incomes
+                dAvgPayoffAction[i] = dPayoffAction[i] / (double) iNumTimesAction[i]; // Avg. value
+                dAuxTot += dAvgPayoffAction[i]; // Adding the individual results
+            }
+
+            for (int i = 0; i < iNumActions; i++) {
+                dProbAction[i] = dAvgPayoffAction[i] / dAuxTot; // Calculating probs.
+            }
+        }
+
+        dAuxTot = 0;
+        dAux = Math.random();
+        for (int i = 0; i < iNumActions; i++) {
+            dAuxTot += dProbAction[i];
+            if (dAux <= dAuxTot) {
+                // iNewAction = i;
+                iNewStockAction = i;
+                break;
+            }
+        }
+    }
+
+    public void vGetNewActionAutomata(String sState, int iNActions, double dReward) {
+        boolean bFound;
+        StateAction oStateProbs;
+
+        bFound = false; // Searching if we already have the state
+        for (int i = 0; i < oVStateActions.size(); i++) {
+            oStateProbs = (StateAction) oVStateActions.elementAt(i);
+            if (oStateProbs.sState.equals(sState)) {
+                oPresentStateAction = oStateProbs;
+                bFound = true;
+                break;
+            }
+        }
+        // If we didn't find it, then we add it
+        if (!bFound) {
+            oPresentStateAction = new StateAction(sState, iNActions, true);
+            oVStateActions.add(oPresentStateAction);
+        }
+
+        if (oLastStateAction != null) { // Adjusting Probabilities
+            if (dReward > 0) { // If reward grows and the previous action was allowed --> reinforce last action
+                for (int i = 0; i < iNActions; i++) {
+                    if (i == iLastAction) {
+                        oLastStateAction.dValAction[i] += dLearnRate * (1.0 - oLastStateAction.dValAction[i]); // Reinforce
+                                                                                                               // the
+                                                                                                               // last
+                                                                                                               // action
+                    } else {
+                        oLastStateAction.dValAction[i] *= (1.0 - dLearnRate); // The rest are weakened
+                    }
+                }
+            }
+        }
+
+        double dValAcc = 0; // Generating the new action based on probabilities
+        double dValRandom = Math.random();
+        for (int i = 0; i < iNActions; i++) {
+            dValAcc += oPresentStateAction.dValAction[i];
+            if (dValRandom < dValAcc) {
+                iNewAction = i;
+                break;
+            }
+        }
+
+        oLastStateAction = oPresentStateAction; // Updating values for the next time
+        dLearnRate *= dDecFactorLR; // Reducing the learning rate
+        if (dLearnRate < dMINLearnRate)
+            dLearnRate = dMINLearnRate;
+    }
+
+    // Metodo para detener el RL Agent
+    protected void takeDown() {
+        System.out.println("RL Agent " + getAID().getName() + " terminating.");
+    }
+
+    public class StateAction {
+        public String sState; // Identificador del estado
+        public double[] dValAction; // Valores asociados a cada acción
+
+        public StateAction(String sState, int iNumActions, boolean bInitialize) {
+            this.sState = sState;
+            this.dValAction = new double[iNumActions];
+
+            if (bInitialize) {
+                double initialValue = 1.0 / iNumActions; // Valores iniciales igualitarios
+                for (int i = 0; i < iNumActions; i++) {
+                    this.dValAction[i] = initialValue;
+                }
+            }
+        }
+    }
+}

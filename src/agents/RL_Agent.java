@@ -12,6 +12,7 @@ import java.util.HashMap;
 
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.Vector;
 
 public class RL_Agent extends Agent {
     enum GameAction {
@@ -44,6 +45,24 @@ public class RL_Agent extends Agent {
     // nuestras y sus acciones
     private HashMap<Integer, ArrayList<Partida>> history;
 
+    // -----------------------------------------------------------
+    // 1) Add new RL-related instance variables
+    // -----------------------------------------------------------
+    final double dDecFactorLR = 0.99;
+    final double dMINLearnRate = 0.05;
+    boolean bAllActions = false;
+    int iNumActions = 2; // For "C" or "D"
+    int iNewAction;
+    int iNewStockAction; // For "B" or "S" if needed
+    int iLastAction;
+    int[] iNumTimesAction = new int[iNumActions];
+    double[] dPayoffAction = new double[iNumActions];
+    double[] dProbAction = new double[iNumActions];
+    Vector<StateAction> oVStateActions;
+    StateAction oPresentStateAction;
+    StateAction oLastStateAction;
+    double dLearnRate = 0.5;
+
     protected void setup() {
         state = State.waitConfig;
 
@@ -53,6 +72,9 @@ public class RL_Agent extends Agent {
         stockPrices = new ArrayList<>();
         inflationRates = new ArrayList<>();
         history = new HashMap<>();
+
+        // 2) Initialize RL collections
+        oVStateActions = new Vector<>();
 
         // Register in the yellow pages as a player
         DFAgentDescription dfd = new DFAgentDescription();
@@ -218,9 +240,12 @@ public class RL_Agent extends Agent {
                 ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
                 accountingMsg.addReceiver(mainAgent);
 
-                // TODO: RL
+                // 5) Optionally pick buy/sell with RL stats
+                vGetNewActionStats();
+                String bsAction = (iNewStockAction == 0) ? "Buy" : "Sell";
+
                 int amount = 1;
-                accountingMsg.setContent(getRandomAction() + "#" + amount);
+                accountingMsg.setContent(bsAction + "#" + amount);
                 printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                 send(accountingMsg);
             } else {
@@ -232,15 +257,10 @@ public class RL_Agent extends Agent {
             ACLMessage txMsg = new ACLMessage(ACLMessage.INFORM);
             txMsg.addReceiver(mainAgent);
 
-            String action = "C"; // Default to cooperate if no history
-
-            // TODO: RL
-            // Get opponent's last action if available
-            if (history.containsKey(opponentId) && !history.get(opponentId).isEmpty()) {
-                ArrayList<Partida> partidasOponente = history.get(opponentId);
-                Partida ultimaPartida = partidasOponente.get(partidasOponente.size() - 1);
-                action = ultimaPartida.accionOponente.toString();
-            }
+            // 3) Use RL to select "C" or "D"
+            vGetNewActionAutomata("Opponent" + opponentId, iNumActions, 0.0);
+            String action = (iNewAction == 0) ? "C" : "D";
+            iLastAction = iNewAction;
 
             txMsg.setContent("Action#" + action);
             printColored(getAID().getName() + " sent " + txMsg.getContent());
@@ -328,6 +348,11 @@ public class RL_Agent extends Agent {
                 }
                 history.get(opponentId).add(partida);
 
+                // 4) After parsing payoffs[myIndex]
+                double reward = Double.parseDouble(payoffs[myIndex]);
+                vGetNewActionAutomata("Opponent" + opponentId, iNumActions, reward);
+                iLastAction = iNewAction;
+
                 printColored(String.format("%s: Round result - My action: %s, Opponent(%d): %s, Payoffs: %s,%s",
                         getAID().getName(), actions[myIndex], opponentId, actions[oppIndex],
                         payoffs[myIndex], payoffs[oppIndex]));
@@ -377,6 +402,96 @@ public class RL_Agent extends Agent {
                 return true;
             }
             return false;
+        }
+    }
+
+    // -----------------------------------------------------------
+    // 6) Add new helper methods and class
+    // -----------------------------------------------------------
+    public void vGetNewActionStats() {
+        // ...logic adapted from test.notjava...
+        // Checking if all actions used
+        if (!bAllActions) {
+            bAllActions = true;
+            for (int i = 0; i < iNumActions; i++) {
+                if (iNumTimesAction[i] == 0) {
+                    bAllActions = false;
+                    break;
+                }
+            }
+        } else {
+            double dAuxTot = 0;
+            double[] dAvgPayoffAction = new double[iNumActions];
+            for (int i = 0; i < iNumActions; i++) {
+                dAvgPayoffAction[i] = dPayoffAction[i] / (double) iNumTimesAction[i];
+                dAuxTot += dAvgPayoffAction[i];
+            }
+            for (int i = 0; i < iNumActions; i++) {
+                dProbAction[i] = dAvgPayoffAction[i] / dAuxTot;
+            }
+        }
+        double dAux = Math.random();
+        double dAuxTot = 0;
+        for (int i = 0; i < iNumActions; i++) {
+            dAuxTot += dProbAction[i];
+            if (dAux <= dAuxTot) {
+                iNewStockAction = i;
+                break;
+            }
+        }
+    }
+
+    public void vGetNewActionAutomata(String sState, int iNActions, double dReward) {
+        boolean bFound = false;
+        for (StateAction sa : oVStateActions) {
+            if (sa.sState.equals(sState)) {
+                oPresentStateAction = sa;
+                bFound = true;
+                break;
+            }
+        }
+        if (!bFound) {
+            oPresentStateAction = new StateAction(sState, iNActions, true);
+            oVStateActions.add(oPresentStateAction);
+        }
+        if (oLastStateAction != null && dReward > 0) {
+            for (int i = 0; i < iNActions; i++) {
+                if (i == iLastAction) {
+                    oLastStateAction.dValAction[i] += dLearnRate * (1.0 - oLastStateAction.dValAction[i]);
+                } else {
+                    oLastStateAction.dValAction[i] *= (1.0 - dLearnRate);
+                }
+            }
+        }
+        double dValAcc = 0;
+        double dValRandom = Math.random();
+        for (int i = 0; i < iNActions; i++) {
+            dValAcc += oPresentStateAction.dValAction[i];
+            if (dValRandom < dValAcc) {
+                iNewAction = i;
+                break;
+            }
+        }
+        oLastStateAction = oPresentStateAction;
+        dLearnRate *= dDecFactorLR;
+        if (dLearnRate < dMINLearnRate)
+            dLearnRate = dMINLearnRate;
+    }
+
+    // Helper class for RL state-action values
+    public class StateAction {
+        public String sState;
+        public double[] dValAction;
+
+        public StateAction(String sState, int iNumActions, boolean bInitialize) {
+            this.sState = sState;
+            this.dValAction = new double[iNumActions];
+            if (bInitialize) {
+                double initialValue = 1.0 / iNumActions;
+                for (int i = 0; i < iNumActions; i++) {
+                    this.dValAction[i] = initialValue;
+                }
+            }
         }
     }
 }
