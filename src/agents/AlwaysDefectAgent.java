@@ -111,7 +111,13 @@ public class AlwaysDefectAgent extends Agent {
                             ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
                             accountingMsg.addReceiver(mainAgent);
                             String action = new Random().nextBoolean() ? "Buy" : "Sell";
-                            accountingMsg.setContent(action + "#" + 1);
+                            int amount;
+                            if (action.equals("Buy")) {
+                                amount = 10;
+                            } else { // Sell
+                                amount = 1;
+                            }
+                            accountingMsg.setContent(action + "#" + amount);
                             printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                             send(accountingMsg);
 
