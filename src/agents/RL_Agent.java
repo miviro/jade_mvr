@@ -454,12 +454,22 @@ public class RL_Agent extends Agent {
             oPresentStateAction = new StateAction(sState, iNActions, true);
             oVStateActions.add(oPresentStateAction);
         }
-        if (oLastStateAction != null && dReward > 0) {
-            for (int i = 0; i < iNActions; i++) {
-                if (i == iLastAction) {
-                    oLastStateAction.dValAction[i] += dLearnRate * (1.0 - oLastStateAction.dValAction[i]);
-                } else {
-                    oLastStateAction.dValAction[i] *= (1.0 - dLearnRate);
+        if (oLastStateAction != null) {
+            double adjustedReward = (dReward >= 2.0) ? 1.0 : 0.0;
+            if (adjustedReward > 0) {
+                for (int i = 0; i < iNActions; i++) {
+                    if (i == iLastAction) {
+                        oLastStateAction.dValAction[i] += dLearnRate * (1.0 - oLastStateAction.dValAction[i]);
+                    } else {
+                        oLastStateAction.dValAction[i] *= (1.0 - dLearnRate);
+                    }
+                }
+            } else {
+                // If payoff < 2, punish last action
+                for (int i = 0; i < iNActions; i++) {
+                    if (i == iLastAction) {
+                        oLastStateAction.dValAction[i] *= (1.0 - dLearnRate);
+                    }
                 }
             }
         }
