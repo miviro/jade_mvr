@@ -233,9 +233,9 @@ public class RL_Agent extends Agent {
                     stocks.remove(stocks.size() - 1);
 
                 money.add(accumulatedPayoff);
-                stockPrices.add(currentStocks);
+                stockPrices.add(currentStockValue);
                 inflationRates.add(inflationRate);
-                stocks.add(currentStockValue);
+                stocks.add(currentStocks);
 
                 ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
                 accountingMsg.addReceiver(mainAgent);
@@ -244,7 +244,12 @@ public class RL_Agent extends Agent {
                 vGetNewActionStats();
                 String bsAction = (iNewStockAction == 0) ? "Buy" : "Sell";
 
-                int amount = 1;
+                // TODO: Calculate amount based on ?
+                float amount = 1;
+                if (bsAction.equals("Buy")) {
+                    amount = (stockPrices.get(stockPrices.size() - 1));
+                }
+
                 accountingMsg.setContent(bsAction + "#" + amount);
                 printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                 send(accountingMsg);
@@ -455,20 +460,29 @@ public class RL_Agent extends Agent {
             oVStateActions.add(oPresentStateAction);
         }
         if (oLastStateAction != null) {
-            double adjustedReward = (dReward >= 2.0) ? 1.0 : 0.0;
+            // Scale rewards: 1.0 for payoff=4 (successful defection), 0.5 for payoff=2
+            // (mutual cooperation), 0.0 otherwise
+            double adjustedReward = 0.0;
+            if (dReward == 4.0) {
+                adjustedReward = 1.0;
+            } else if (dReward == 2.0) {
+                adjustedReward = 0.5;
+            }
+
             if (adjustedReward > 0) {
                 for (int i = 0; i < iNActions; i++) {
                     if (i == iLastAction) {
-                        oLastStateAction.dValAction[i] += dLearnRate * (1.0 - oLastStateAction.dValAction[i]);
+                        oLastStateAction.dValAction[i] += dLearnRate
+                                * (adjustedReward - oLastStateAction.dValAction[i]);
                     } else {
-                        oLastStateAction.dValAction[i] *= (1.0 - dLearnRate);
+                        oLastStateAction.dValAction[i] *= (1.0 - dLearnRate * adjustedReward);
                     }
                 }
             } else {
-                // If payoff < 2, punish last action
+                // If payoff = 0, punish last action more strongly
                 for (int i = 0; i < iNActions; i++) {
                     if (i == iLastAction) {
-                        oLastStateAction.dValAction[i] *= (1.0 - dLearnRate);
+                        oLastStateAction.dValAction[i] *= (1.0 - dLearnRate * 0.8); // Stronger punishment
                     }
                 }
             }
