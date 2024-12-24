@@ -62,6 +62,7 @@ public class RL_Agent extends Agent {
     StateAction oPresentStateAction;
     StateAction oLastStateAction;
     double dLearnRate = 0.5;
+    private int iLastStockAction = -1; // store last chosen stock action
 
     protected void setup() {
         state = State.waitConfig;
@@ -243,6 +244,7 @@ public class RL_Agent extends Agent {
                 // 5) Optionally pick buy/sell with RL stats
                 vGetNewActionStats();
                 String bsAction = (iNewStockAction == 0) ? "Buy" : "Sell";
+                iLastStockAction = iNewStockAction; // remember chosen stock action for RL reward
 
                 float currentMoney = money.get(money.size() - 1);
                 // Decide fractions to buy or sell
@@ -310,6 +312,30 @@ public class RL_Agent extends Agent {
 
                 printColored(getAID().getName() + ": Updated payoff=" + updatedPayoff +
                         ", assets=" + updatedAssets);
+
+                // Once payoff and assets are updated, compute stock reward
+                if (stockPrices.size() >= 2 && inflationRates.size() >= 1 && iLastStockAction != -1) {
+                    float lastPrice = stockPrices.get(stockPrices.size() - 2);
+                    float newPrice = stockPrices.get(stockPrices.size() - 1);
+                    float inflationRate = inflationRates.get(inflationRates.size() - 1);
+
+                    float priceChange = newPrice - lastPrice;
+                    float inflationAmount = lastPrice * inflationRate; // approximate growth from inflation
+
+                    double stockReward = 0.0;
+                    // If we bought and price didn't keep up with inflation => negative reward
+                    if (iLastStockAction == 0 && priceChange < inflationAmount) {
+                        stockReward = -1.0;
+                    }
+                    // If we sold and price later dipped => maybe small positive reward
+                    else if (iLastStockAction == 1 && priceChange < inflationAmount) {
+                        stockReward = 0.5;
+                    }
+                    // pass the result to RL
+                    vGetNewActionAutomata("StockState", 2, stockReward);
+                    iLastAction = iLastStockAction;
+                    iLastStockAction = -1;
+                }
 
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException(getAID().getName() + ": Error parsing accounting values");
