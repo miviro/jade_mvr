@@ -56,7 +56,7 @@ public class MainAgent extends Agent {
     }
 
     private static float getInflationRate(int currentRound) {
-        return (float) 1 / 100;
+        return (float) 0 / 100;
     }
 
     @Override

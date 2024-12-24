@@ -63,6 +63,7 @@ public class RL_Agent extends Agent {
     StateAction oLastStateAction;
     double dLearnRate = 0.5;
     private int iLastStockAction = -1; // store last chosen stock action
+    private int consecutiveFailingBuys = 0; // Track consecutive failing buys
 
     protected void setup() {
         state = State.waitConfig;
@@ -224,15 +225,6 @@ public class RL_Agent extends Agent {
                 Float currentStockValue = Float.parseFloat(parts[6]);
 
                 // Update current values (removing if exists, then adding)
-                if (!money.isEmpty())
-                    money.remove(money.size() - 1);
-                if (!stockPrices.isEmpty())
-                    stockPrices.remove(stockPrices.size() - 1);
-                if (!inflationRates.isEmpty())
-                    inflationRates.remove(inflationRates.size() - 1);
-                if (!stocks.isEmpty())
-                    stocks.remove(stocks.size() - 1);
-
                 money.add(accumulatedPayoff);
                 stockPrices.add(currentStockValue);
                 inflationRates.add(inflationRate);
@@ -299,14 +291,6 @@ public class RL_Agent extends Agent {
 
                 // Update current values (removing if exists, then adding)
                 // solo guardoamos los estados dspues de la accion
-                if (!money.isEmpty() && !stocks.isEmpty()) {
-                    money.remove(money.size() - 1);
-                    stocks.remove(stocks.size() - 1);
-                } else {
-                    // should always exist
-                    throw new IllegalArgumentException(getAID().getName() + ": No previous accounting values");
-                }
-
                 money.add(updatedPayoff);
                 stocks.add(updatedAssets);
 
@@ -319,21 +303,29 @@ public class RL_Agent extends Agent {
                     float newPrice = stockPrices.get(stockPrices.size() - 1);
                     float inflationRate = inflationRates.get(inflationRates.size() - 1);
 
-                    float priceChange = newPrice - lastPrice;
-                    float inflationAmount = lastPrice * inflationRate; // approximate growth from inflation
+                    float priceChange = (newPrice - lastPrice) / 100;
 
                     double stockReward = 0.0;
-                    // If we bought and price didn't keep up with inflation => negative reward
-                    if (iLastStockAction == 0 && priceChange < inflationAmount) {
-                        stockReward = -1.0;
-                    }
-                    // If we sold and price later dipped => maybe small positive reward
-                    else if (iLastStockAction == 1 && priceChange < inflationAmount) {
-                        stockReward = 0.5;
+                    if (iLastStockAction == 0 && priceChange < inflationRate) {
+                        consecutiveFailingBuys++;
+                        stockReward = -3.0 * consecutiveFailingBuys; // further stronger penalty
+                        // Prevent buying after 3 consecutive failing buys
+                        if (consecutiveFailingBuys >= 3) {
+                            // Force action to Sell
+                            iNewStockAction = 1;
+                            stockReward = 2.0; // reward for forced sell
+                        }
+                    } else if (iLastStockAction == 0) {
+                        consecutiveFailingBuys = 0;
+                        stockReward = 0.3; // slightly increased positive reward
+                    } else if (iLastStockAction == 1 && priceChange < inflationRate) {
+                        stockReward = 1.5; // increased reward for selling in a downward environment
+                    } else if (iLastStockAction == 1 && priceChange >= inflationRate) {
+                        stockReward = 0.5; // slight reward for selling even if not necessary
                     }
                     // pass the result to RL
                     vGetNewActionAutomata("StockState", 2, stockReward);
-                    iLastAction = iLastStockAction;
+                    iLastAction = iNewStockAction;
                     iLastStockAction = -1;
                 }
 
@@ -519,13 +511,18 @@ public class RL_Agent extends Agent {
                 }
             }
         }
-        double dValAcc = 0;
-        double dValRandom = Math.random();
-        for (int i = 0; i < iNActions; i++) {
-            dValAcc += oPresentStateAction.dValAction[i];
-            if (dValRandom < dValAcc) {
-                iNewAction = i;
-                break;
+        // Adjust action selection to prioritize selling after consecutive failing buys
+        if (consecutiveFailingBuys >= 3) {
+            iNewAction = 1; // Force Sell
+        } else {
+            double dValAcc = 0;
+            double dValRandom = Math.random();
+            for (int i = 0; i < iNActions; i++) {
+                dValAcc += oPresentStateAction.dValAction[i];
+                if (dValRandom < dValAcc) {
+                    iNewAction = i;
+                    break;
+                }
             }
         }
         oLastStateAction = oPresentStateAction;
