@@ -207,7 +207,28 @@ public class PSI_25 extends Agent {
                 accountingMsg.addReceiver(mainAgent);
 
                 // TODO:
-                // accountingMsg.setContent(bsAction + "#" + amount);
+                // if the %difference between last stockPrices and second to last stockPrices is
+                // positive and greater than %current inflation, Buy with all our money. Else
+                // sell everything
+                float lastPrice = 0;
+                float prevPrice = 0;
+                try {
+                    lastPrice = stockPrices.get(stockPrices.size() - 1);
+                    prevPrice = stockPrices.get(stockPrices.size() - 2);
+                } catch (Exception e) {
+                    lastPrice = 1;
+                    prevPrice = 1; // Avoid division by zero
+                }
+                float diffPercent = ((lastPrice - prevPrice) / prevPrice) * 100;
+                float currentInflation = inflationRates.get(inflationRates.size() - 1);
+
+                if (diffPercent > currentInflation && diffPercent > 0) {
+                    // Buy with all money
+                    accountingMsg.setContent("Buy#" + money.get(money.size() - 1));
+                } else {
+                    // Sell everything
+                    accountingMsg.setContent("Sell#" + stocks.get(stocks.size() - 1));
+                }
 
                 printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                 send(accountingMsg);
@@ -220,10 +241,31 @@ public class PSI_25 extends Agent {
             ACLMessage txMsg = new ACLMessage(ACLMessage.INFORM);
             txMsg.addReceiver(mainAgent);
 
-            // TODO:
-            // txMsg.setContent("Action#" + action);
+            // Analyze last 10 opponent actions
+            try {
+                ArrayList<Partida> opponentHistory = history.get(opponentId);
+                int cooperateCount = 0;
+                int totalActions = Math.min(10, opponentHistory.size());
+                for (int i = opponentHistory.size() - totalActions; i < opponentHistory.size(); i++) {
+                    if (opponentHistory.get(i).accionOponente == GameAction.C) {
+                        cooperateCount++;
+                    }
+                }
+                double cooperateRatio = (double) cooperateCount / totalActions;
 
-            printColored(getAID().getName() + " sent " + txMsg.getContent());
+                if (cooperateRatio > 0.7) {
+                    // Opponent is cooperating
+                    txMsg.setContent("Action#C");
+                } else {
+                    // Opponent is defecting
+                    txMsg.setContent("Action#D");
+                }
+
+                printColored(getAID().getName() + " sent " + txMsg.getContent());
+            } catch (Exception e) {
+                // default to cooperate
+                txMsg.setContent("Action#C");
+            }
             send(txMsg);
         }
 
