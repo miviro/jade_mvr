@@ -46,7 +46,12 @@ public class MainAgent extends Agent {
     private long gameEndTime;
 
     private static float getIndexValue(int currentRound) {
-        return (float) (20.00 + 10 * Math.sin(currentRound / 10.0));
+        // seno
+        // return (float) (20.00 + 10 * Math.sin(currentRound / 10.0));
+        // decreciente
+        System.out.println(
+                "price: " + (float) (20.00 * ((float) 1 - ((float) currentRound / (float) getGameParameters().R))));
+        return (float) (20.00 * ((float) 1 - ((float) currentRound / (float) getGameParameters().R)));
     }
 
     private static float getInflationRate(int currentRound) {
