@@ -888,11 +888,11 @@ public class MainAgent extends Agent {
 
         }
 
-        // Keep last 5 actions
+        // Keep last 10 actions
         public void addLastAction(String action) {
             this.lastActions = action + this.lastActions;
-            if (this.lastActions.length() > 5) {
-                this.lastActions = this.lastActions.substring(0, 5);
+            if (this.lastActions.length() > 10) {
+                this.lastActions = this.lastActions.substring(0, 10);
             }
         }
 
