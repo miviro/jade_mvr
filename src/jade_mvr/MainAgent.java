@@ -49,9 +49,11 @@ public class MainAgent extends Agent {
         // seno
         // return (float) (20.00 + 10 * Math.sin(currentRound / 10.0));
         // decreciente
-        System.out.println(
-                "price: " + (float) (20.00 * ((float) 1 - ((float) currentRound / (float) getGameParameters().R))));
-        return (float) (20.00 * ((float) 1 - ((float) currentRound / (float) getGameParameters().R)));
+        // return (float) (20.00 * ((float) 1 - ((float) currentRound / (float)
+        // getGameParameters().R)));
+        // decreciente con seno
+        return (float) (1 + (20.00 * ((float) 1 - ((float) currentRound / (float) getGameParameters().R))
+                + 1 * Math.sin(currentRound / 10.0)));
     }
 
     private static float getInflationRate(int currentRound) {
