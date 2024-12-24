@@ -108,19 +108,27 @@ public class AlwaysDefectAgent extends Agent {
                             }
                         } else if (msg.getPerformative() == ACLMessage.REQUEST
                                 && msg.getContent().startsWith("RoundOver")) {
-                            ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
-                            accountingMsg.addReceiver(mainAgent);
-                            String action = new Random().nextBoolean() ? "Buy" : "Sell";
-                            int amount;
-                            if (action.equals("Buy")) {
-                                amount = 10;
-                            } else { // Sell
-                                amount = 1;
-                            }
-                            accountingMsg.setContent(action + "#" + amount);
-                            printColored(getAID().getName() + " sent " + accountingMsg.getContent());
-                            send(accountingMsg);
+                            // Parse
+                            // RoundOver#ID#roundPayoff#accumulatedPayoff#inflationRate#currentStocks#currentStockValue
+                            String[] parts = msg.getContent().split("#");
+                            if (parts.length == 7) {
+                                float currentStockValue = Float.parseFloat(parts[6]);
 
+                                ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
+                                accountingMsg.addReceiver(mainAgent);
+                                String action = new Random().nextBoolean() ? "Buy" : "Sell";
+                                float amount;
+
+                                if (action.equals("Buy")) {
+                                    amount = currentStockValue;
+                                } else { // Sell
+                                    amount = 1;
+                                }
+
+                                accountingMsg.setContent(action + "#" + amount);
+                                printColored(getAID().getName() + " sent " + accountingMsg.getContent());
+                                send(accountingMsg);
+                            }
                             state = State.waitAccounting;
                         } else if (msg.getPerformative() == ACLMessage.INFORM
                                 && msg.getContent().startsWith("GameOver")) {
