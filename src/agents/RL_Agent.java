@@ -244,10 +244,20 @@ public class RL_Agent extends Agent {
                 vGetNewActionStats();
                 String bsAction = (iNewStockAction == 0) ? "Buy" : "Sell";
 
-                // TODO: Calculate amount based on ?
-                float amount = 1;
+                float lastPrice = stockPrices.get(stockPrices.size() - 1);
+                if (lastPrice == 0) {
+                    lastPrice = 1;
+                }
+                float currentMoney = money.get(money.size() - 1);
+                // Decide fractions to buy or sell
+                float buyFraction = 0.1f;
+                float sellFraction = 0.1f;
+                float amount = 0f;
+
                 if (bsAction.equals("Buy")) {
-                    amount = (stockPrices.get(stockPrices.size() - 1));
+                    amount = buyFraction * currentMoney / lastPrice;
+                } else {
+                    amount = sellFraction * currentStocks;
                 }
 
                 accountingMsg.setContent(bsAction + "#" + amount);
