@@ -4,6 +4,7 @@ Additional functionalities:
     - Clicking on the Last Actions cell of an agent will open its game history.
     - Dynamic agent creation and destruction, no need to relaunch the program.
     - Real time stat updates.
+    - Clicking the stock cell shows when an agent bought and sold in a graph of the stock.
 
 Folder structure:
 jade_mvr/
@@ -39,6 +40,7 @@ Notes:
     - We only run the MainAgent, which will be in charge of starting and killing new agents as requested by the user.
     - Agents participating in the tournaments should have its .java file placed on the src/agents/ folder.
     - Java 17 is required.
+    - LLMs used for some code.
     - Do not run it in VSCode, it will crash with many rounds and/or agents.
     - Sending command output to /dev/null will help with performance.
 

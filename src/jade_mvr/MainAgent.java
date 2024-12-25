@@ -11,9 +11,12 @@ import jade.lang.acl.ACLMessage;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.swing.JButton;
@@ -47,15 +50,14 @@ public class MainAgent extends Agent {
     private volatile boolean gameRunning = false;
     private long gameStartTime;
 
+    private static ArrayList<Float> indexHistory = new ArrayList<>();
+
     private static float getIndexValue(int currentRound) {
-        // seno
-        return (float) (20.00 + 10 * Math.sin(currentRound / 10.0));
-        // decreciente
-        // return (float) (20.00 * ((float) 1 - ((float) currentRound / (float)
-        // getGameParameters().R)));
-        // decreciente con seno
-        // return (float) (1 + (20.00 * (1.0f - ((float) currentRound / (float)
-        // getGameParameters().R)) + 1 * Math.sin(currentRound / 10.0)));
+        float value = (float) (20.00 + 10 * Math.sin(currentRound / 10.0));
+        if (currentRound >= indexHistory.size()) {
+            indexHistory.add(value);
+        }
+        return value;
     }
 
     private static float getInflationRate(int currentRound) {
@@ -312,7 +314,8 @@ public class MainAgent extends Agent {
                                     if (player.getMoney() >= amount) {
                                         player.setMoney(player.getMoney() - amount);
                                         player.setAssets(player.getAssets() + (amount / getIndexValue(currentRound)));
-                                        String contentLog = "Player " + player.id + " bought " + amount + " assets ";
+                                        String contentLog = "Player " + player.id + " round: " + currentRound
+                                                + ": bought:" + amount;
 
                                         view.appendLog(contentLog, true);
                                         player.addLastActionList(contentLog);
@@ -326,7 +329,9 @@ public class MainAgent extends Agent {
                                         float fee = assetValue * ((float) getGameParameters().S / 100);
                                         player.setAssets(player.getAssets() - amount);
                                         player.setMoney(player.getMoney() + assetValue - fee);
-                                        String contentLog = "Player " + player.id + " sold assets worth " + assetValue;
+                                        String contentLog = "Player " + player.id + " round: " + currentRound
+                                                + ": sold:"
+                                                + assetValue;
                                         view.appendLog(contentLog, true);
                                         player.addLastActionList(contentLog);
                                     } else {
@@ -786,6 +791,12 @@ public class MainAgent extends Agent {
                                 frame.setLocationRelativeTo(null);
                                 frame.setVisible(true);
                             }
+                        } else if (col == 5) { // assets
+                            PlayerInformation player = playerAgents.get(row);
+                            ArrayList<String> lastActionsList = player.getLastActionsList();
+                            if (player != null) {
+                                showAssetGraph(lastActionsList);
+                            }
                         }
                     }
                 }
@@ -1026,5 +1037,146 @@ public class MainAgent extends Agent {
         public void checkPermission(Permission perm) {
             // Allow other permissions
         }
+    }
+
+    private void showAssetGraph(ArrayList<String> actions) {
+        HashMap<Integer, Float> transactions = new HashMap<>();
+
+        if (actions.isEmpty()) {
+            JOptionPane.showMessageDialog(view, "No actions to display", "No Data",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        // Parse transactions into a map of round -> amount
+        for (String action : actions) {
+            if (action.contains("Player") && (action.contains("bought:") || action.contains("sold:"))) {
+                try {
+                    String[] parts = action.split("round: ");
+                    if (parts.length > 1) {
+                        String[] roundPart = parts[1].split(":");
+                        int round = Integer.parseInt(roundPart[0].trim());
+                        float amount;
+                        if (action.contains("bought:")) {
+                            amount = Float.parseFloat(action.split("bought:")[1].trim());
+                        } else {
+                            amount = -Float.parseFloat(action.split("sold:")[1].trim());
+                        }
+                        transactions.put(round, amount);
+                    }
+                } catch (Exception e) {
+                    continue;
+                }
+            }
+        }
+
+        // Create graph window
+        JFrame graphFrame = new JFrame("Stock Price and Transactions History");
+        graphFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        graphFrame.setSize(800, 500);
+        graphFrame.setLocationRelativeTo(null);
+
+        // Create custom panel for graph
+        JPanel graphPanel = new JPanel() {
+            @Override
+            protected void paintComponent(java.awt.Graphics g) {
+                super.paintComponent(g);
+                java.awt.Graphics2D g2 = (java.awt.Graphics2D) g;
+                g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                        java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+
+                int padding = 50;
+                int width = getWidth() - 2 * padding;
+                int height = getHeight() - 2 * padding;
+
+                // Find min and max values for both price and transactions
+                float maxPrice = Collections.max(indexHistory);
+                float minPrice = Collections.min(indexHistory);
+                float maxTransaction = transactions.isEmpty() ? 0 : Collections.max(transactions.values());
+                float minTransaction = transactions.isEmpty() ? 0 : Collections.min(transactions.values());
+                float priceRange = maxPrice - minPrice;
+                float transactionRange = Math.max(Math.abs(maxTransaction), Math.abs(minTransaction));
+
+                // Draw axes
+                g2.setColor(java.awt.Color.BLACK);
+                g2.drawLine(padding, padding, padding, height + padding); // Y axis
+                g2.drawLine(padding, height + padding, width + padding, height + padding); // X axis
+
+                // Draw price scale (left side)
+                g2.drawString(String.format("%.2f", maxPrice), padding - 45, padding);
+                g2.drawString(String.format("%.2f", minPrice), padding - 45, height + padding);
+
+                // Draw transaction scale (right side)
+                g2.drawString(String.format("%.2f", transactionRange), width + padding + 5, padding);
+                g2.drawString(String.format("%.2f", -transactionRange), width + padding + 5, height + padding);
+
+                // Plot stock price line
+                g2.setColor(java.awt.Color.BLUE);
+                g2.setStroke(new java.awt.BasicStroke(2));
+                int prevX = -1;
+                int prevY = -1;
+
+                for (int i = 0; i < indexHistory.size(); i++) {
+                    float price = indexHistory.get(i);
+                    int x = padding + (i * width / (indexHistory.size() - 1));
+                    int y = padding + (int) ((maxPrice - price) * height / priceRange);
+
+                    if (prevX != -1) {
+                        g2.drawLine(prevX, prevY, x, y);
+                    }
+                    prevX = x;
+                    prevY = y;
+                }
+
+                // Plot transactions
+                for (Map.Entry<Integer, Float> entry : transactions.entrySet()) {
+                    int round = entry.getKey();
+                    float amount = entry.getValue();
+                    float price = indexHistory.get(round);
+
+                    int x = padding + (round * width / (indexHistory.size() - 1));
+                    int y = padding + (int) ((maxPrice - price) * height / priceRange);
+
+                    // Draw transaction point
+                    int pointSize = (int) (Math.abs(amount) / transactionRange * 20) + 5; // Scale point size by amount
+                    g2.setColor(amount > 0 ? new java.awt.Color(0, 150, 0, 180) : new java.awt.Color(150, 0, 0, 180));
+                    g2.fillOval(x - pointSize / 2, y - pointSize / 2, pointSize, pointSize);
+
+                    // Draw amount label
+                    g2.setColor(java.awt.Color.BLACK);
+                    g2.drawString(String.format("%.1f", Math.abs(amount)), x + 5, y - 5);
+                }
+
+                // Draw round numbers
+                g2.setColor(java.awt.Color.BLACK);
+                for (int i = 0; i < indexHistory.size(); i += indexHistory.size() / 10) {
+                    int x = padding + (i * width / (indexHistory.size() - 1));
+                    g2.drawString(String.valueOf(i), x - 10, height + padding + 15);
+                }
+
+                // Draw legend
+                int legendX = padding + 10;
+                int legendY = padding + 20;
+                g2.setColor(java.awt.Color.BLUE);
+                g2.drawLine(legendX, legendY, legendX + 30, legendY);
+                g2.setColor(java.awt.Color.BLACK);
+                g2.drawString("Stock Price", legendX + 40, legendY + 5);
+
+                legendY += 20;
+                g2.setColor(new java.awt.Color(0, 150, 0));
+                g2.fillOval(legendX + 10, legendY - 5, 10, 10);
+                g2.setColor(java.awt.Color.BLACK);
+                g2.drawString("Buy", legendX + 40, legendY + 5);
+
+                legendY += 20;
+                g2.setColor(new java.awt.Color(150, 0, 0));
+                g2.fillOval(legendX + 10, legendY - 5, 10, 10);
+                g2.setColor(java.awt.Color.BLACK);
+                g2.drawString("Sell", legendX + 40, legendY + 5);
+            }
+        };
+
+        graphFrame.add(graphPanel);
+        graphFrame.setVisible(true);
     }
 }
