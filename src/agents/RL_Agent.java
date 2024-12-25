@@ -32,7 +32,7 @@ public class RL_Agent extends Agent {
     private ArrayList<Float> stockPrices;
     private ArrayList<Float> inflationRates;
 
-    final double dDecFactorLR = 0.99;
+    final double dDecFactorLR = 0.9999;
     final double dMINLearnRate = 0.05;
     boolean bAllActions = false;
     int iNumActions = 2; // For "C" or "D"

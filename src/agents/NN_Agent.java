@@ -552,7 +552,7 @@ public class NN_Agent extends Agent {
         private int iInputSize; // Size of the input vector
         private int iRadio; // BMU radio to modify neurons
         private double dLearnRate = 1.0; // Learning rate for this SOM
-        private double dDecLearnRate = 0.999; // Used to reduce the learning rate
+        private double dDecLearnRate = 0.9999; // Used to reduce the learning rate
         private double[] dBMU_Vector = null; // BMU state
         private double[][][] dGrid; // SOM square grid + vector state per neuron
 
