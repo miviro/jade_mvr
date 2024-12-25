@@ -11,6 +11,7 @@ import jade.lang.acl.ACLMessage;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
@@ -18,9 +19,11 @@ import java.util.Set;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
+import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 
@@ -175,7 +178,7 @@ public class MainAgent extends Agent {
                     }
                 }
                 processGameOver();
-
+                createLeaderboard();
                 gameRunning = false;
 
                 // si estamos aqui, hemos terminado todas las rondas
@@ -194,6 +197,30 @@ public class MainAgent extends Agent {
             }
         });
         gameThread.start();
+    }
+
+    private void createLeaderboard() {
+        // Calculate net worth for each player
+        ArrayList<PlayerInformation> sortedPlayers = new ArrayList<>(playerAgents);
+        sortedPlayers.sort((a, b) -> {
+            float netWorthA = a.getMoney() + (a.getAssets() * getIndexValue(currentRound));
+            float netWorthB = b.getMoney() + (b.getAssets() * getIndexValue(currentRound));
+            return Float.compare(netWorthB, netWorthA); // Descending order
+        });
+
+        // Build leaderboard string
+        StringBuilder leaderboard = new StringBuilder("Leaderboard:\n");
+        for (int i = 0; i < sortedPlayers.size(); i++) {
+            PlayerInformation player = sortedPlayers.get(i);
+            float netWorth = player.getMoney() + (player.getAssets() * getIndexValue(currentRound));
+            leaderboard.append(String.format("%d. %s - Net Worth: %.2f\n",
+                    i + 1, player.aid.getLocalName(), netWorth));
+        }
+
+        // Display leaderboard in the GUI
+        SwingUtilities.invokeLater(() -> {
+            JOptionPane.showMessageDialog(view, leaderboard.toString(), "Leaderboard", JOptionPane.INFORMATION_MESSAGE);
+        });
     }
 
     private void playXRounds(int rounds) {
