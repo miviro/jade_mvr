@@ -257,7 +257,10 @@ public class MainAgent extends Agent {
         java.util.Map<AID, ACLMessage> receivedMessages = new HashMap<>();
 
         while (receivedMessages.size() < playerAgents.size()) {
-            ACLMessage msg = blockingReceive();
+            ACLMessage msg = blockingReceive(5000);
+            if (msg == null) {
+                throw new RuntimeException("Timeout waiting for messages from players");
+            }
             if (msg != null && msg.getPerformative() == ACLMessage.INFORM) {
                 AID sender = msg.getSender();
                 if (!receivedMessages.containsKey(sender)) {
@@ -426,7 +429,10 @@ public class MainAgent extends Agent {
         String player1Action = null;
         String player2Action = null;
         while (player1Action == null || player2Action == null) {
-            ACLMessage msg = blockingReceive(); // da error pero funciona
+            ACLMessage msg = blockingReceive(5000);
+            if (msg == null) {
+                throw new RuntimeException("Timeout waiting for Action message");
+            }
             if (msg != null) {
                 String[] content = msg.getContent().split("#");
                 if (content[0].equals("Action") && content.length > 1) {
@@ -800,6 +806,11 @@ public class MainAgent extends Agent {
         }
     }
 
+    // para no pisar R a veces
+    public static void setGameN(int n) {
+        gameParameters.N = n;
+    }
+
     public static void main(String[] args) {
         new MainAgent();
     }
@@ -989,5 +1000,4 @@ public class MainAgent extends Agent {
             // Allow other permissions
         }
     }
-
 }

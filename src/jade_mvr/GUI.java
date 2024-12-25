@@ -149,7 +149,6 @@ public class GUI extends JFrame {
         knownAgentsPanel.setLayout(new BoxLayout(knownAgentsPanel, BoxLayout.Y_AXIS));
 
         ArrayList<String> agentNames = MainAgent.getAgentTypesList();
-        GameParametersStruct params = MainAgent.getGameParameters();
 
         // Set N to number of agent types (1 agent per type)
         int totalAgents = agentNames.size();
