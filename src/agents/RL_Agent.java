@@ -32,15 +32,12 @@ public class RL_Agent extends Agent {
     private ArrayList<Float> stockPrices;
     private ArrayList<Float> inflationRates;
 
-    // -----------------------------------------------------------
-    // 1) Add new RL-related instance variables
-    // -----------------------------------------------------------
     final double dDecFactorLR = 0.99;
     final double dMINLearnRate = 0.05;
     boolean bAllActions = false;
     int iNumActions = 2; // For "C" or "D"
     int iNewAction;
-    int iNewStockAction; // For "B" or "S" if needed
+    int iNewStockAction; // For "Buy" or "Sell" if needed
     int iLastAction;
     int[] iNumTimesAction = new int[iNumActions];
     double[] dPayoffAction = new double[iNumActions];
@@ -51,6 +48,34 @@ public class RL_Agent extends Agent {
     double dLearnRate = 0.5;
     private int iLastStockAction = -1; // store last chosen stock action
     private int consecutiveFailingBuys = 0; // Track consecutive failing buys
+
+    // Separate “last-action” variables
+    private int iLastPdAction;
+    private int iNewPdAction;
+
+    // Separate StateAction references
+    private StateAction oLastStateAction_PD;
+    private StateAction oLastStateAction_Stock;
+
+    // Separate RL collections for PD and Stock
+    private Vector<StateAction> oVStateActions_PD;
+    private Vector<StateAction> oVStateActions_Stock;
+
+    // Separate learning rates
+    private double dLearnRate_PD = 0.5;
+    private double dLearnRate_Stock = 0.5;
+
+    // Separate action count arrays
+    private int[] iNumTimesAction_PD = new int[iNumActions];
+    private int[] iNumTimesAction_Stock = new int[iNumActions];
+
+    // Add these new instance variables
+    private boolean bAllActions_PD = false;
+    private boolean bAllActions_Stock = false;
+    private double[] dProbAction_PD = new double[iNumActions];
+    private double[] dProbAction_Stock = new double[iNumActions];
+    private double[] dPayoffAction_PD = new double[iNumActions];
+    private double[] dPayoffAction_Stock = new double[iNumActions];
 
     protected void setup() {
         state = State.waitConfig;
@@ -63,6 +88,20 @@ public class RL_Agent extends Agent {
 
         // 2) Initialize RL collections
         oVStateActions = new Vector<>();
+
+        // Initialize separate RL collections
+        oVStateActions_PD = new Vector<>();
+        oVStateActions_Stock = new Vector<>();
+
+        // Initialize StateAction references
+        oLastStateAction_PD = null;
+        oLastStateAction_Stock = null;
+
+        // Initialize newly added arrays
+        dProbAction_PD = new double[iNumActions];
+        dProbAction_Stock = new double[iNumActions];
+        dPayoffAction_PD = new double[iNumActions];
+        dPayoffAction_Stock = new double[iNumActions];
 
         // Register in the yellow pages as a player
         DFAgentDescription dfd = new DFAgentDescription();
@@ -89,7 +128,7 @@ public class RL_Agent extends Agent {
             e.printStackTrace();
         }
 
-        System.out.println("RandomPlayer " + getAID().getName() + " terminating.");
+        System.out.println("RL_Agent " + getAID().getName() + " terminating.");
         System.exit(0);
     }
 
@@ -215,7 +254,6 @@ public class RL_Agent extends Agent {
                 ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
                 accountingMsg.addReceiver(mainAgent);
 
-                // 5) Optionally pick buy/sell with RL stats
                 vGetNewActionStats();
                 String bsAction = (iNewStockAction == 0) ? "Buy" : "Sell";
                 iLastStockAction = iNewStockAction; // remember chosen stock action for RL reward
@@ -248,14 +286,182 @@ public class RL_Agent extends Agent {
             ACLMessage txMsg = new ACLMessage(ACLMessage.INFORM);
             txMsg.addReceiver(mainAgent);
 
-            // 3) Use RL to select "C" or "D"
-            vGetNewActionAutomata("Opponent" + opponentId, iNumActions, 0.0);
-            String action = (iNewAction == 0) ? "C" : "D";
-            iLastAction = iNewAction;
+            // PD action
+            String action = (iNewPdAction == 0) ? "C" : "D";
+            iLastPdAction = iNewPdAction;
 
             txMsg.setContent("Action#" + action);
             printColored(getAID().getName() + " sent " + txMsg.getContent());
             send(txMsg);
+        }
+
+        // Separate RL methods for PD
+        public void vGetNewActionAutomata_PD(String sState, int iNActions, double dReward) {
+            boolean bFound = false;
+            for (StateAction sa : oVStateActions_PD) {
+                if (sa.sState.equals(sState)) {
+                    oPresentStateAction = sa;
+                    bFound = true;
+                    break;
+                }
+            }
+            if (!bFound) {
+                oPresentStateAction = new StateAction(sState, iNActions, true);
+                oVStateActions_PD.add(oPresentStateAction);
+            }
+            if (oLastStateAction_PD != null) {
+                // Scale rewards for PD
+                double adjustedReward = 0.0;
+                if (dReward == 4.0) {
+                    adjustedReward = 1.0;
+                } else if (dReward == 2.0) {
+                    adjustedReward = 0.5;
+                }
+
+                if (adjustedReward > 0) {
+                    for (int i = 0; i < iNActions; i++) {
+                        if (i == iLastPdAction) {
+                            oLastStateAction_PD.dValAction[i] += dLearnRate_PD
+                                    * (adjustedReward - oLastStateAction_PD.dValAction[i]);
+                        } else {
+                            oLastStateAction_PD.dValAction[i] *= (1.0 - dLearnRate_PD * adjustedReward);
+                        }
+                    }
+                } else {
+                    // If payoff = 0, punish last action more strongly
+                    for (int i = 0; i < iNActions; i++) {
+                        if (i == iLastPdAction) {
+                            oLastStateAction_PD.dValAction[i] *= (1.0 - dLearnRate_PD * 0.8); // Stronger punishment
+                        }
+                    }
+                }
+            }
+            // Action selection for PD
+            double dValAcc = 0;
+            double dValRandom = Math.random();
+            for (int i = 0; i < iNActions; i++) {
+                dValAcc += oPresentStateAction.dValAction[i];
+                if (dValRandom < dValAcc) {
+                    iNewPdAction = i;
+                    break;
+                }
+            }
+            oLastStateAction_PD = oPresentStateAction;
+            dLearnRate_PD *= dDecFactorLR;
+            if (dLearnRate_PD < dMINLearnRate)
+                dLearnRate_PD = dMINLearnRate;
+
+            // Increment PD action count
+            iNumTimesAction_PD[iNewPdAction]++;
+        }
+
+        // Separate RL methods for Stock
+        public void vGetNewActionAutomata_Stock(String sState, int iNActions, double dReward) {
+            if (consecutiveFailingBuys >= 3) {
+                iNewStockAction = 1; // Force Sell
+                consecutiveFailingBuys = 0; // Reset counter
+                // Update Q-value for forced action
+                boolean bFound = false;
+                for (StateAction sa : oVStateActions_Stock) {
+                    if (sa.sState.equals(sState)) {
+                        oPresentStateAction = sa;
+                        bFound = true;
+                        break;
+                    }
+                }
+                if (!bFound) {
+                    oPresentStateAction = new StateAction(sState, iNActions, true);
+                    oVStateActions_Stock.add(oPresentStateAction);
+                }
+                if (oLastStateAction_Stock != null) {
+                    double adjustedReward = dReward; // Assuming stockReward is already scaled appropriately
+
+                    if (adjustedReward > 0) {
+                        for (int i = 0; i < iNActions; i++) {
+                            if (i == iLastStockAction) {
+                                oLastStateAction_Stock.dValAction[i] += dLearnRate_Stock
+                                        * (adjustedReward - oLastStateAction_Stock.dValAction[i]);
+                            } else {
+                                oLastStateAction_Stock.dValAction[i] *= (1.0 - dLearnRate_Stock * adjustedReward);
+                            }
+                        }
+                    } else {
+                        // If reward <= 0, punish last action more strongly
+                        for (int i = 0; i < iNActions; i++) {
+                            if (i == iLastStockAction) {
+                                oLastStateAction_Stock.dValAction[i] *= (1.0 - dLearnRate_Stock * 0.8); // Stronger
+                                                                                                        // punishment
+                            }
+                        }
+                    }
+                }
+
+                // Select forced action
+                // No random selection needed
+                oLastStateAction_Stock = oPresentStateAction;
+                dLearnRate_Stock *= dDecFactorLR;
+                if (dLearnRate_Stock < dMINLearnRate)
+                    dLearnRate_Stock = dMINLearnRate;
+
+                // Increment Stock action count
+                iNumTimesAction_Stock[iNewStockAction]++;
+                return; // Exit to enforce forced sell
+            }
+
+            // Normal action selection
+            boolean bFound = false;
+            for (StateAction sa : oVStateActions_Stock) {
+                if (sa.sState.equals(sState)) {
+                    oPresentStateAction = sa;
+                    bFound = true;
+                    break;
+                }
+            }
+            if (!bFound) {
+                oPresentStateAction = new StateAction(sState, iNActions, true);
+                oVStateActions_Stock.add(oPresentStateAction);
+            }
+            if (oLastStateAction_Stock != null) {
+                // Scale rewards for Stock
+                double adjustedReward = dReward; // Assuming stockReward is already scaled appropriately
+
+                if (adjustedReward > 0) {
+                    for (int i = 0; i < iNActions; i++) {
+                        if (i == iLastStockAction) {
+                            oLastStateAction_Stock.dValAction[i] += dLearnRate_Stock
+                                    * (adjustedReward - oLastStateAction_Stock.dValAction[i]);
+                        } else {
+                            oLastStateAction_Stock.dValAction[i] *= (1.0 - dLearnRate_Stock * adjustedReward);
+                        }
+                    }
+                } else {
+                    // If reward <= 0, punish last action more strongly
+                    for (int i = 0; i < iNActions; i++) {
+                        if (i == iLastStockAction) {
+                            oLastStateAction_Stock.dValAction[i] *= (1.0 - dLearnRate_Stock * 0.8); // Stronger
+                                                                                                    // punishment
+                        }
+                    }
+                }
+            }
+
+            // Action selection
+            double dValAcc = 0;
+            double dValRandom = Math.random();
+            for (int i = 0; i < iNActions; i++) {
+                dValAcc += oPresentStateAction.dValAction[i];
+                if (dValRandom < dValAcc) {
+                    iNewStockAction = i;
+                    break;
+                }
+            }
+            oLastStateAction_Stock = oPresentStateAction;
+            dLearnRate_Stock *= dDecFactorLR;
+            if (dLearnRate_Stock < dMINLearnRate)
+                dLearnRate_Stock = dMINLearnRate;
+
+            // Increment Stock action count
+            iNumTimesAction_Stock[iNewStockAction]++;
         }
 
         // Accounting#ID#Payoff#Assets
@@ -309,10 +515,11 @@ public class RL_Agent extends Agent {
                     } else if (iLastStockAction == 1 && priceChange >= inflationRate) {
                         stockReward = 0.5; // slight reward for selling even if not necessary
                     }
+                    // necesario?
+                    dPayoffAction_Stock[iLastStockAction] += stockReward;
                     // pass the result to RL
-                    vGetNewActionAutomata("StockState", 2, stockReward);
-                    iLastAction = iNewStockAction;
-                    iLastStockAction = -1;
+                    vGetNewActionAutomata_Stock("StockState", 2, stockReward);
+                    iLastStockAction = iNewStockAction; // Corrected assignment
                 }
 
             } catch (NumberFormatException e) {
@@ -321,7 +528,6 @@ public class RL_Agent extends Agent {
         }
 
         // Results#[ID0,ID1]#[C,D]#[X,Y]
-        //
         public void processResults(ACLMessage msg) {
             String[] parts = msg.getContent().split("#");
             if (parts.length != 4) {
@@ -355,8 +561,9 @@ public class RL_Agent extends Agent {
 
                 // 4) After parsing payoffs[myIndex]
                 double reward = Double.parseDouble(payoffs[myIndex]);
-                vGetNewActionAutomata("Opponent" + opponentId, iNumActions, reward);
-                iLastAction = iNewAction;
+                dPayoffAction_PD[iLastPdAction] += reward;
+                vGetNewActionAutomata_PD("Opponent" + opponentId, iNumActions, reward);
+                iLastPdAction = iNewPdAction; // Corrected assignment
 
                 printColored(String.format("%s: Round result - My action: %s, Opponent(%d): %s, Payoffs: %s,%s",
                         getAID().getName(), actions[myIndex], opponentId, actions[oppIndex],
@@ -411,103 +618,77 @@ public class RL_Agent extends Agent {
             }
             return false;
         }
-    }
 
-    // -----------------------------------------------------------
-    // 6) Add new helper methods and class
-    // -----------------------------------------------------------
-    public void vGetNewActionStats() {
-        // ...logic adapted from test.notjava...
-        // Checking if all actions used
-        if (!bAllActions) {
-            bAllActions = true;
-            for (int i = 0; i < iNumActions; i++) {
-                if (iNumTimesAction[i] == 0) {
-                    bAllActions = false;
-                    break;
-                }
-            }
-        } else {
-            double dAuxTot = 0;
-            double[] dAvgPayoffAction = new double[iNumActions];
-            for (int i = 0; i < iNumActions; i++) {
-                dAvgPayoffAction[i] = dPayoffAction[i] / (double) iNumTimesAction[i];
-                dAuxTot += dAvgPayoffAction[i];
-            }
-            for (int i = 0; i < iNumActions; i++) {
-                dProbAction[i] = dAvgPayoffAction[i] / dAuxTot;
-            }
-        }
-        double dAux = Math.random();
-        double dAuxTot = 0;
-        for (int i = 0; i < iNumActions; i++) {
-            dAuxTot += dProbAction[i];
-            if (dAux <= dAuxTot) {
-                iNewStockAction = i;
-                break;
-            }
-        }
-    }
-
-    public void vGetNewActionAutomata(String sState, int iNActions, double dReward) {
-        boolean bFound = false;
-        for (StateAction sa : oVStateActions) {
-            if (sa.sState.equals(sState)) {
-                oPresentStateAction = sa;
-                bFound = true;
-                break;
-            }
-        }
-        if (!bFound) {
-            oPresentStateAction = new StateAction(sState, iNActions, true);
-            oVStateActions.add(oPresentStateAction);
-        }
-        if (oLastStateAction != null) {
-            // Scale rewards: 1.0 for payoff=4 (successful defection), 0.5 for payoff=2
-            // (mutual cooperation), 0.0 otherwise
-            double adjustedReward = 0.0;
-            if (dReward == 4.0) {
-                adjustedReward = 1.0;
-            } else if (dReward == 2.0) {
-                adjustedReward = 0.5;
-            }
-
-            if (adjustedReward > 0) {
-                for (int i = 0; i < iNActions; i++) {
-                    if (i == iLastAction) {
-                        oLastStateAction.dValAction[i] += dLearnRate
-                                * (adjustedReward - oLastStateAction.dValAction[i]);
-                    } else {
-                        oLastStateAction.dValAction[i] *= (1.0 - dLearnRate * adjustedReward);
+        public void vGetNewActionStats() {
+            // Separate action stats for PD and Stock
+            // PD actions
+            if (!bAllActions_PD) {
+                bAllActions_PD = true;
+                for (int i = 0; i < iNumActions; i++) {
+                    if (iNumTimesAction_PD[i] == 0) {
+                        bAllActions_PD = false;
+                        break;
                     }
                 }
             } else {
-                // If payoff = 0, punish last action more strongly
-                for (int i = 0; i < iNActions; i++) {
-                    if (i == iLastAction) {
-                        oLastStateAction.dValAction[i] *= (1.0 - dLearnRate * 0.8); // Stronger punishment
+                double dAuxTot_PD = 0;
+                double[] dAvgPayoffAction_PD = new double[iNumActions];
+                for (int i = 0; i < iNumActions; i++) {
+                    dAvgPayoffAction_PD[i] = dPayoffAction_PD[i] / (double) iNumTimesAction_PD[i];
+                    dAuxTot_PD += dAvgPayoffAction_PD[i];
+                }
+                for (int i = 0; i < iNumActions; i++) {
+                    dProbAction_PD[i] = dAvgPayoffAction_PD[i] / dAuxTot_PD;
+                }
+            }
+
+            // Stock actions
+            if (!bAllActions_Stock) {
+                bAllActions_Stock = true;
+                for (int i = 0; i < iNumActions; i++) {
+                    if (iNumTimesAction_Stock[i] == 0) {
+                        bAllActions_Stock = false;
+                        break;
+                    }
+                }
+            } else {
+                double dAuxTot_Stock = 0;
+                double[] dAvgPayoffAction_Stock = new double[iNumActions];
+                for (int i = 0; i < iNumActions; i++) {
+                    dAvgPayoffAction_Stock[i] = dPayoffAction_Stock[i] / (double) iNumTimesAction_Stock[i];
+                    dAuxTot_Stock += dAvgPayoffAction_Stock[i];
+                }
+                for (int i = 0; i < iNumActions; i++) {
+                    dProbAction_Stock[i] = dAvgPayoffAction_Stock[i] / dAuxTot_Stock;
+                }
+            }
+
+            // PD action selection
+            if (bAllActions_PD) {
+                double dAux_PD = Math.random();
+                double dAuxTot_PD = 0;
+                for (int i = 0; i < iNumActions; i++) {
+                    dAuxTot_PD += dProbAction_PD[i];
+                    if (dAux_PD <= dAuxTot_PD) {
+                        iNewPdAction = i;
+                        break;
+                    }
+                }
+            }
+
+            // Stock action selection
+            if (bAllActions_Stock) {
+                double dAux_Stock = Math.random();
+                double dAuxTot_Stock = 0;
+                for (int i = 0; i < iNumActions; i++) {
+                    dAuxTot_Stock += dProbAction_Stock[i];
+                    if (dAux_Stock <= dAuxTot_Stock) {
+                        iNewStockAction = i;
+                        break;
                     }
                 }
             }
         }
-        // Adjust action selection to prioritize selling after consecutive failing buys
-        if (consecutiveFailingBuys >= 3) {
-            iNewAction = 1; // Force Sell
-        } else {
-            double dValAcc = 0;
-            double dValRandom = Math.random();
-            for (int i = 0; i < iNActions; i++) {
-                dValAcc += oPresentStateAction.dValAction[i];
-                if (dValRandom < dValAcc) {
-                    iNewAction = i;
-                    break;
-                }
-            }
-        }
-        oLastStateAction = oPresentStateAction;
-        dLearnRate *= dDecFactorLR;
-        if (dLearnRate < dMINLearnRate)
-            dLearnRate = dMINLearnRate;
     }
 
     // Helper class for RL state-action values
