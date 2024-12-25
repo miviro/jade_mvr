@@ -246,29 +246,48 @@ public class PSI_25 extends Agent {
             ACLMessage txMsg = new ACLMessage(ACLMessage.INFORM);
             txMsg.addReceiver(mainAgent);
 
-            // Analyze last 10 opponent actions
-            // TODO: check if he played D because we played D in the last round or if we
-            // played C in the last and he betrayed us
             try {
                 ArrayList<Partida> opponentHistory = history.get(opponentId);
-                int cooperateCount = 0;
-                int totalActions = Math.min(10, opponentHistory.size());
-                for (int i = opponentHistory.size() - totalActions; i < opponentHistory.size(); i++) {
-                    if (opponentHistory.get(i).accionOponente == GameAction.C) {
-                        cooperateCount++;
+                int windowSize = 20;
+                int startIndex = Math.max(0, opponentHistory.size() - windowSize);
+                GameAction nextAction;
+
+                // Check for "D with no consequences" and "C then opponent D"
+                boolean continueD = false;
+                boolean switchToD = false;
+                for (int i = startIndex; i < opponentHistory.size() - 1; i++) {
+                    Partida current = opponentHistory.get(i);
+                    Partida next = opponentHistory.get(i + 1);
+                    if (current.accionPropia == GameAction.D && next.accionOponente == GameAction.C) {
+                        continueD = true;
+                        break;
+                    }
+                    if (current.accionPropia == GameAction.C && next.accionOponente == GameAction.D) {
+                        switchToD = true;
+                        break;
                     }
                 }
-                double cooperateRatio = (double) cooperateCount / totalActions;
 
-                if (cooperateRatio > 0.7) {
-                    // Opponent is cooperating
-                    txMsg.setContent("Action#C");
+                if (continueD) {
+                    nextAction = GameAction.D;
+                } else if (switchToD) {
+                    nextAction = GameAction.D;
                 } else {
-                    // Opponent is defecting
-                    txMsg.setContent("Action#D");
+                    // Otherwise rely on our last action or default to C, with a 5% chance to flip
+                    Partida lastPartida = opponentHistory.isEmpty()
+                            ? null
+                            : opponentHistory.get(opponentHistory.size() - 1);
+                    if (lastPartida != null) {
+                        nextAction = lastPartida.accionPropia;
+                        if (Math.random() < 0.05) {
+                            nextAction = (nextAction == GameAction.C) ? GameAction.D : GameAction.C;
+                        }
+                    } else {
+                        nextAction = GameAction.C;
+                    }
                 }
 
-                printColored(getAID().getName() + " sent " + txMsg.getContent());
+                txMsg.setContent("Action#" + nextAction.name());
             } catch (Exception e) {
                 // default to cooperate
                 txMsg.setContent("Action#C");
