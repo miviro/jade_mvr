@@ -28,11 +28,22 @@ public class NN_Agent extends Agent {
     private ArrayList<Float> stocks;
     private ArrayList<Float> stockPrices;
     private ArrayList<Float> inflationRates;
-    // Toda la historia de todas las partidas contra cada oponente, incluyendo
-    // nuestras y sus acciones
 
-    // Add new SOM instance variable
-    private SOM som; // CHOICE: Instantiate SOM for decision making
+    // Define maximum sizes for the lists
+    private static final int MAX_SIZE = 100;
+
+    // Define dynamic maximum values for normalization
+    private float maxMoney = 10000f;
+    private float maxStocks = 1000f;
+    private float maxStockPrice = 1000f;
+    private float maxInflation = 10f;
+
+    // Define gridSide as a class-level variable
+    private int gridSide = 10; // Grid size of 10x10
+
+    // Separate SOM instances
+    private SOM somStockMarket;
+    private SOM somPrisonersDilemma;
 
     protected void setup() {
         state = State.waitConfig;
@@ -44,17 +55,18 @@ public class NN_Agent extends Agent {
         inflationRates = new ArrayList<>();
 
         // Initialize the SOM with chosen parameters
-        int gridSide = 10; // CHOICE: Grid size of 10x10
-        int inputSize = 4; // CHOICE: Example input size
-        som = new SOM(gridSide, inputSize); // CHOICE: Initialize SOM
-        // Optionally reset SOM values if necessary
-        som.vResetValues(); // CHOICE: Reset SOM grid
+        int inputSize = 4; // Example input size
+        somStockMarket = new SOM(gridSide, inputSize); // Initialize SOM
+        somStockMarket.vResetValues(); // Reset SOM grid
+
+        somPrisonersDilemma = new SOM(gridSide, inputSize); // Initialize SOM
+        somPrisonersDilemma.vResetValues(); // Reset SOM grid
 
         // Initialize lists with default values to prevent IndexOutOfBoundsException
-        money.add(0f); // CHOICE: Initialize money with default value
-        stocks.add(0f); // CHOICE: Initialize stocks with default value
-        stockPrices.add(0f); // CHOICE: Initialize stockPrices with default value
-        inflationRates.add(0f); // CHOICE: Initialize inflationRates with default value
+        money.add(0f); // Initialize money with default value
+        stocks.add(0f); // Initialize stocks with default value
+        stockPrices.add(0f); // Initialize stockPrices with default value
+        inflationRates.add(0f); // Initialize inflationRates with default value
 
         // Register in the yellow pages as a player
         DFAgentDescription dfd = new DFAgentDescription();
@@ -204,41 +216,112 @@ public class NN_Agent extends Agent {
                 inflationRates.add(inflationRate);
                 stocks.add(currentStocks);
 
+                // Limit the size of the lists
+                if (money.size() > MAX_SIZE)
+                    money.remove(0);
+                if (stocks.size() > MAX_SIZE)
+                    stocks.remove(0);
+                if (stockPrices.size() > MAX_SIZE)
+                    stockPrices.remove(0);
+                if (inflationRates.size() > MAX_SIZE)
+                    inflationRates.remove(0);
+
+                // Update maximum values dynamically
+                if (accumulatedPayoff > maxMoney)
+                    maxMoney = accumulatedPayoff;
+                if (currentStocks > maxStocks)
+                    maxStocks = currentStocks;
+                if (currentStockValue > maxStockPrice)
+                    maxStockPrice = currentStockValue;
+                if (inflationRate > maxInflation)
+                    maxInflation = inflationRate;
+
                 ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
                 accountingMsg.addReceiver(mainAgent);
 
-                // Generate input vector for SOM based on current state
-                double[] inputVector = new double[] { /* CHOICE: Define input features */
-                        money.isEmpty() ? 0 : money.get(money.size() - 1),
-                        stocks.isEmpty() ? 0 : stocks.get(stocks.size() - 1),
-                        stockPrices.isEmpty() ? 0 : stockPrices.get(stockPrices.size() - 1),
-                        inflationRates.isEmpty() ? 0 : inflationRates.get(inflationRates.size() - 1)
+                // Normalize input values
+                double[] inputVector = new double[] {
+                        accumulatedPayoff / maxMoney,
+                        currentStocks / maxStocks,
+                        currentStockValue / maxStockPrice,
+                        inflationRate / maxInflation
                 };
 
-                // Use SOM to get BMU and select action
-                String bmu = som.sGetBMU(inputVector, true, 1.0); // CHOICE: Train SOM with input and default reward
+                // Use SOM Stock Market
+                String bmu = somStockMarket.sGetBMU(inputVector, true);
                 String[] coords = bmu.split(",");
                 int x = Integer.parseInt(coords[0]);
                 int y = Integer.parseInt(coords[1]);
 
-                // Map BMU position to action
+                // Improved quadrant-based action mapping
                 String bsAction;
-                if ((x + y) % 2 == 0) { // CHOICE: Simple mapping based on BMU position
-                    bsAction = "Buy";
+                if (x < gridSide / 2 && y < gridSide / 2) {
+                    if (y < gridSide / 3) {
+                        bsAction = "Buy Large";
+                    } else if (y < 2 * gridSide / 3) {
+                        bsAction = "Buy Medium";
+                    } else {
+                        bsAction = "Buy Small";
+                    }
+                } else if (x < 2 * gridSide / 3) {
+                    if (y < gridSide / 3) {
+                        bsAction = "Hold Large";
+                    } else if (y < 2 * gridSide / 3) {
+                        bsAction = "Hold Medium";
+                    } else {
+                        bsAction = "Hold Small";
+                    }
                 } else {
-                    bsAction = "Sell";
+                    if (y < gridSide / 3) {
+                        bsAction = "Sell Large";
+                    } else if (y < 2 * gridSide / 3) {
+                        bsAction = "Sell Medium";
+                    } else {
+                        bsAction = "Sell Small";
+                    }
                 }
 
                 float currentMoney = money.get(money.size() - 1);
                 // Decide fractions to buy or sell
-                float buyFraction = 1.0f - (float) currentRound / R;
-                float sellFraction = 1.0f - (float) currentRound / R;
+                float buyFraction = 1.0f - (float) currentRound / (2 * R);
+                if (buyFraction > 1.0f) {
+                    buyFraction = 1.0f;
+                }
+                float sellFraction = 1.0f - (float) currentRound / (2 * R);
+                if (sellFraction > 1.0f) {
+                    sellFraction = 1.0f;
+                }
                 float amount = 0f;
 
-                if (bsAction.equals("Buy")) {
-                    amount = (buyFraction * currentMoney);
-                } else {
-                    amount = sellFraction * currentStocks;
+                switch (bsAction) {
+                    case "Buy Large":
+                        bsAction = "Buy";
+                        amount = buyFraction * currentMoney;
+                        break;
+                    case "Buy Medium":
+                        bsAction = "Buy";
+                        amount = buyFraction * currentMoney / 10;
+                        break;
+                    case "Buy Small":
+                        bsAction = "Buy";
+                        amount = buyFraction * currentMoney / 100;
+                        break;
+                    case "Sell Large":
+                        bsAction = "Sell";
+                        amount = sellFraction * currentStocks;
+                        break;
+                    case "Sell Medium":
+                        bsAction = "Sell";
+                        amount = sellFraction * currentStocks / 10;
+                        break;
+                    case "Sell Small":
+                        bsAction = "Sell";
+                        amount = sellFraction * currentStocks / 100;
+                        break;
+                    default: // Hold
+                        bsAction = "Buy";
+                        amount = 0f;
+                        break;
                 }
 
                 accountingMsg.setContent(bsAction + "#" + amount);
@@ -255,26 +338,46 @@ public class NN_Agent extends Agent {
             ACLMessage txMsg = new ACLMessage(ACLMessage.INFORM);
             txMsg.addReceiver(mainAgent);
 
-            // Generate input vector for SOM based on current state
-            double[] inputVector = new double[] { /* CHOICE: Define input features */
-                    money.isEmpty() ? 0 : money.get(money.size() - 1),
-                    stocks.isEmpty() ? 0 : stocks.get(stocks.size() - 1),
-                    stockPrices.isEmpty() ? 0 : stockPrices.get(stockPrices.size() - 1),
-                    inflationRates.isEmpty() ? 0 : inflationRates.get(inflationRates.size() - 1)
+            // Normalize input values
+            double[] inputVector = new double[] {
+                    money.get(money.size() - 1) / maxMoney,
+                    stocks.get(stocks.size() - 1) / maxStocks,
+                    stockPrices.get(stockPrices.size() - 1) / maxStockPrice,
+                    inflationRates.get(inflationRates.size() - 1) / maxInflation
             };
 
-            // Use SOM to get BMU and select action
-            String bmu = som.sGetBMU(inputVector, true, 1.0); // CHOICE: Train SOM with input and default reward
+            // Use SOM Prisoner's Dilemma
+            String bmu = somPrisonersDilemma.sGetBMU(inputVector, true);
             String[] coords = bmu.split(",");
             int x = Integer.parseInt(coords[0]);
             int y = Integer.parseInt(coords[1]);
 
-            // Map BMU position to action
+            // Improved quadrant-based action mapping to 9 zones
             String action;
-            if ((x + y) % 2 == 0) { // CHOICE: Simple mapping based on BMU position
-                action = "C";
+            if (x < gridSide / 3) {
+                if (y < gridSide / 3) {
+                    action = "C"; // Cooperate Large
+                } else if (y < 2 * gridSide / 3) {
+                    action = "C"; // Cooperate Medium
+                } else {
+                    action = "D"; // Defect Small
+                }
+            } else if (x < 2 * gridSide / 3) {
+                if (y < gridSide / 3) {
+                    action = "C"; // Cooperate Large
+                } else if (y < 2 * gridSide / 3) {
+                    action = "D"; // Defect Medium
+                } else {
+                    action = "D"; // Defect Small
+                }
             } else {
-                action = "D";
+                if (y < gridSide / 3) {
+                    action = "C"; // Cooperate Large
+                } else if (y < 2 * gridSide / 3) {
+                    action = "D"; // Defect Medium
+                } else {
+                    action = "D"; // Defect Small
+                }
             }
 
             txMsg.setContent("Action#" + action);
@@ -304,19 +407,31 @@ public class NN_Agent extends Agent {
                 money.add(updatedPayoff);
                 stocks.add(updatedAssets);
 
+                // Limit the size of the lists
+                if (money.size() > MAX_SIZE)
+                    money.remove(0);
+                if (stocks.size() > MAX_SIZE)
+                    stocks.remove(0);
+
+                // Update maximum values dynamically
+                if (updatedPayoff > maxMoney)
+                    maxMoney = updatedPayoff;
+                if (updatedAssets > maxStocks)
+                    maxStocks = updatedAssets;
+
                 printColored(getAID().getName() + ": Updated payoff=" + updatedPayoff +
                         ", assets=" + updatedAssets);
 
-                // CHOICE: Create input vector for SOM based on updated state
+                // Normalize input values
                 double[] inputVector = new double[] {
-                        updatedPayoff,
-                        updatedAssets,
-                        stockPrices.isEmpty() ? 0 : stockPrices.get(stockPrices.size() - 1),
-                        inflationRates.isEmpty() ? 0 : inflationRates.get(inflationRates.size() - 1)
+                        updatedPayoff / maxMoney,
+                        updatedAssets / maxStocks,
+                        stockPrices.get(stockPrices.size() - 1) / maxStockPrice,
+                        inflationRates.get(inflationRates.size() - 1) / maxInflation
                 };
 
-                // Update SOM with the new input and reward
-                som.sGetBMU(inputVector, true, 1.0); // CHOICE: Train SOM with new input and default reward
+                // Use SOM Stock Market with normalized reward
+                somStockMarket.sGetBMU(inputVector, true); // Train SOM with new input and default reward
 
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException(getAID().getName() + ": Error parsing accounting values");
@@ -356,9 +471,9 @@ public class NN_Agent extends Agent {
                     throw new IllegalArgumentException("Player ID not found in Results message");
                 }
 
-                // CHOICE: Use payoff as reward to train SOM
+                // Use payoff as reward to train SOM
                 double reward = Double.parseDouble(payoffs[myIndex]);
-                double normalizedReward = reward / 10.0; // CHOICE: Normalize reward
+                double normalizedReward = reward / 10.0; // Normalize reward
 
                 // Safety checks to prevent IndexOutOfBoundsException
                 double moneyValue = !money.isEmpty() ? money.get(money.size() - 1) : 0.0;
@@ -368,12 +483,12 @@ public class NN_Agent extends Agent {
                         : 0.0;
 
                 double[] inputVector = new double[] {
-                        moneyValue,
-                        stocksValue,
-                        stockPriceValue,
-                        inflationRateValue
+                        moneyValue / maxMoney,
+                        stocksValue / maxStocks,
+                        stockPriceValue / maxStockPrice,
+                        inflationRateValue / maxInflation
                 };
-                som.sGetBMU(inputVector, true, normalizedReward); // CHOICE: Train SOM with input and reward
+                somPrisonersDilemma.sGetBMU(inputVector, true); // Train SOM with input and reward
 
                 printColored(String.format("%s: Round result - My action: %s, Opponent(%d): %s, Payoffs: %s,%s",
                         getAID().getName(), actions[myIndex], opponentId, actions[oppIndex],
@@ -451,7 +566,7 @@ public class NN_Agent extends Agent {
         public SOM(int iSideAux, int iInputSizeAux) {
             iInputSize = iInputSizeAux;
             iGridSide = iSideAux;
-            iRadio = iGridSide / 10;
+            iRadio = iGridSide / 2; // Initialize iRadio to gridSide / 2
             dBMU_Vector = new double[iInputSize];
             dGrid = new double[iGridSide][iGridSide][iInputSize];
             iNumTimesBMU = new int[iGridSide][iGridSide];
@@ -491,7 +606,7 @@ public class NN_Agent extends Agent {
          * @param bTrain  training or testing phases
          * 
          */
-        public String sGetBMU(double[] dmInput, boolean bTrain, double reward) { // CHOICE: Added reward parameter
+        public String sGetBMU(double[] dmInput, boolean bTrain) { // Added reward parameter
             int x = 0, y = 0;
             double dNorm, dNormMin = Double.MAX_VALUE;
             String sReturn;
@@ -512,6 +627,7 @@ public class NN_Agent extends Agent {
             if (bTrain) {
                 int xAux = 0;
                 int yAux = 0;
+
                 for (int v = -iRadio; v <= iRadio; v++) // Adjusting the neighborhood
                     for (int h = -iRadio; h <= iRadio; h++) {
                         xAux = x + h;
@@ -528,11 +644,14 @@ public class NN_Agent extends Agent {
                             yAux -= iGridSide;
 
                         for (int k = 0; k < iInputSize; k++)
-                            dGrid[xAux][yAux][k] += dLearnRate * reward * (dmInput[k] - dGrid[xAux][yAux][k])
+                            dGrid[xAux][yAux][k] += dLearnRate * (dmInput[k] - dGrid[xAux][yAux][k])
                                     / (1 + v * v + h * h);
-
                     }
 
+                // Decay the neighborhood radius over time
+                if (dLearnRate < 0.1 && iRadio > 1) {
+                    iRadio--;
+                }
             }
 
             sReturn = "" + x + "," + y;
@@ -546,5 +665,4 @@ public class NN_Agent extends Agent {
         }
 
     } // End of SOM class
-
 }
