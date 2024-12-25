@@ -8,34 +8,19 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
-import java.util.HashMap;
 
 import java.util.ArrayList;
-import java.util.Random;
-import java.util.Vector;
-
-// import src.SOM; // CHOICE: Remove the import statement for SOM
 
 public class NN_Agent extends Agent {
     enum GameAction {
         C, D
     }
 
-    private class Partida {
-        public GameAction accionPropia;
-        public GameAction accionOponente;
-
-        public Partida(GameAction accionPropia, GameAction accionOponente) {
-            this.accionPropia = accionPropia;
-            this.accionOponente = accionOponente;
-        }
-    }
-
     private State state;
     private AID mainAgent;
     private int myId, opponentId;
-    private int N, R;
-    private float stockSellFee;
+    private int R;
+    private int currentRound;
     private ACLMessage msg;
 
     // Add these new instance variables
@@ -45,7 +30,6 @@ public class NN_Agent extends Agent {
     private ArrayList<Float> inflationRates;
     // Toda la historia de todas las partidas contra cada oponente, incluyendo
     // nuestras y sus acciones
-    private HashMap<Integer, ArrayList<Partida>> history;
 
     // Add new SOM instance variable
     private SOM som; // CHOICE: Instantiate SOM for decision making
@@ -58,7 +42,6 @@ public class NN_Agent extends Agent {
         stocks = new ArrayList<>();
         stockPrices = new ArrayList<>();
         inflationRates = new ArrayList<>();
-        history = new HashMap<>();
 
         // Initialize the SOM with chosen parameters
         int gridSide = 10; // CHOICE: Grid size of 10x10
@@ -104,10 +87,6 @@ public class NN_Agent extends Agent {
 
     private enum State {
         waitConfig, waitGame, waitAction, waitResults, waitAccounting
-    }
-
-    private String getRandomAction() {
-        return new Random().nextBoolean() ? "C" : "D";
     }
 
     private void printColored(String text) {
@@ -237,7 +216,7 @@ public class NN_Agent extends Agent {
                 };
 
                 // Use SOM to get BMU and select action
-                String bmu = som.sGetBMU(inputVector, true); // CHOICE: Train SOM with input
+                String bmu = som.sGetBMU(inputVector, true, 1.0); // CHOICE: Train SOM with input and default reward
                 String[] coords = bmu.split(",");
                 int x = Integer.parseInt(coords[0]);
                 int y = Integer.parseInt(coords[1]);
@@ -252,8 +231,8 @@ public class NN_Agent extends Agent {
 
                 float currentMoney = money.get(money.size() - 1);
                 // Decide fractions to buy or sell
-                float buyFraction = 0.1f;
-                float sellFraction = 0.1f;
+                float buyFraction = 1.0f - (float) currentRound / R;
+                float sellFraction = 1.0f - (float) currentRound / R;
                 float amount = 0f;
 
                 if (bsAction.equals("Buy")) {
@@ -265,6 +244,8 @@ public class NN_Agent extends Agent {
                 accountingMsg.setContent(bsAction + "#" + amount);
                 printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                 send(accountingMsg);
+
+                currentRound++;
             } else {
                 throw new IllegalArgumentException("Invalid RoundOver message format");
             }
@@ -283,7 +264,7 @@ public class NN_Agent extends Agent {
             };
 
             // Use SOM to get BMU and select action
-            String bmu = som.sGetBMU(inputVector, true); // CHOICE: Train SOM with input
+            String bmu = som.sGetBMU(inputVector, true, 1.0); // CHOICE: Train SOM with input and default reward
             String[] coords = bmu.split(",");
             int x = Integer.parseInt(coords[0]);
             int y = Integer.parseInt(coords[1]);
@@ -335,7 +316,7 @@ public class NN_Agent extends Agent {
                 };
 
                 // Update SOM with the new input and reward
-                som.sGetBMU(inputVector, true); // CHOICE: Train SOM with new input
+                som.sGetBMU(inputVector, true, 1.0); // CHOICE: Train SOM with new input and default reward
 
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException(getAID().getName() + ": Error parsing accounting values");
@@ -375,16 +356,6 @@ public class NN_Agent extends Agent {
                     throw new IllegalArgumentException("Player ID not found in Results message");
                 }
 
-                // Store the game outcome
-                Partida partida = new Partida(GameAction.valueOf(actions[myIndex]),
-                        GameAction.valueOf(actions[oppIndex]));
-
-                // Initialize history for this opponent if needed
-                if (!history.containsKey(opponentId)) {
-                    history.put(opponentId, new ArrayList<>());
-                }
-                history.get(opponentId).add(partida);
-
                 // CHOICE: Use payoff as reward to train SOM
                 double reward = Double.parseDouble(payoffs[myIndex]);
                 double normalizedReward = reward / 10.0; // CHOICE: Normalize reward
@@ -402,7 +373,7 @@ public class NN_Agent extends Agent {
                         stockPriceValue,
                         inflationRateValue
                 };
-                som.sGetBMU(inputVector, true); // CHOICE: Train SOM with input and reward
+                som.sGetBMU(inputVector, true, normalizedReward); // CHOICE: Train SOM with input and reward
 
                 printColored(String.format("%s: Round result - My action: %s, Opponent(%d): %s, Payoffs: %s,%s",
                         getAID().getName(), actions[myIndex], opponentId, actions[oppIndex],
@@ -424,14 +395,15 @@ public class NN_Agent extends Agent {
                 return false;
             }
             int tMyId = Integer.parseInt(parts[1]);
-            int tN = Integer.parseInt(params[0]);
+            // int tN = Integer.parseInt(params[0]);
             int tR = Integer.parseInt(params[1]);
-            float tS = Float.parseFloat(params[2]);
+            // float tS = Float.parseFloat(params[2]);
 
             // At this point everything should be fine, updating class variables
             mainAgent = msg.getSender();
-            N = tN;
-            stockSellFee = tS;
+            // ver equivalent en RL
+            // N = tN;
+            // stockSellFee = tS;
             R = tR;
             myId = tMyId;
             return true;
@@ -519,7 +491,7 @@ public class NN_Agent extends Agent {
          * @param bTrain  training or testing phases
          * 
          */
-        public String sGetBMU(double[] dmInput, boolean bTrain) {
+        public String sGetBMU(double[] dmInput, boolean bTrain, double reward) { // CHOICE: Added reward parameter
             int x = 0, y = 0;
             double dNorm, dNormMin = Double.MAX_VALUE;
             String sReturn;
@@ -556,8 +528,9 @@ public class NN_Agent extends Agent {
                             yAux -= iGridSide;
 
                         for (int k = 0; k < iInputSize; k++)
-                            dGrid[xAux][yAux][k] += dLearnRate * (dmInput[k] - dGrid[xAux][yAux][k])
+                            dGrid[xAux][yAux][k] += dLearnRate * reward * (dmInput[k] - dGrid[xAux][yAux][k])
                                     / (1 + v * v + h * h);
+
                     }
 
             }

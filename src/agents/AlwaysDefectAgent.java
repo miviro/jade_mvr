@@ -59,10 +59,6 @@ public class AlwaysDefectAgent extends Agent {
         waitConfig, waitGame, waitAction, waitResults, waitAccounting
     }
 
-    private String getRandomAction() {
-        return new Random().nextBoolean() ? "C" : "D";
-    }
-
     private void printColored(String text) {
         if (myId % 2 == 0) {
             System.out.println("\u001B[31m" + text + "\u001B[0m"); // Red color for even IDs

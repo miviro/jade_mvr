@@ -43,7 +43,6 @@ public class MainAgent extends Agent {
     private Thread gameThread;
     private volatile boolean gameRunning = false;
     private long gameStartTime;
-    private long gameEndTime;
 
     private static float getIndexValue(int currentRound) {
         // seno
@@ -87,6 +86,7 @@ public class MainAgent extends Agent {
         return 0;
     }
 
+    @SuppressWarnings("removal")
     public MainAgent() {
         System.setSecurityManager(new NoExitSecurityManager());
 
@@ -957,6 +957,7 @@ public class MainAgent extends Agent {
         }
     }
 
+    @SuppressWarnings("removal")
     public class NoExitSecurityManager extends SecurityManager {
         private static final Set<String> ALLOWED_CLASSES = new HashSet<>(Arrays.asList(
                 "src.jade_mvr.MainAgent", // Replace with your MainAgent's fully qualified class name

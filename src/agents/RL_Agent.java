@@ -8,10 +8,8 @@ import jade.domain.FIPAAgentManagement.DFAgentDescription;
 import jade.domain.FIPAAgentManagement.ServiceDescription;
 import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
-import java.util.HashMap;
 
 import java.util.ArrayList;
-import java.util.Random;
 import java.util.Vector;
 
 public class RL_Agent extends Agent {
@@ -19,21 +17,13 @@ public class RL_Agent extends Agent {
         C, D
     }
 
-    private class Partida {
-        public GameAction accionPropia;
-        public GameAction accionOponente;
-
-        public Partida(GameAction accionPropia, GameAction accionOponente) {
-            this.accionPropia = accionPropia;
-            this.accionOponente = accionOponente;
-        }
-    }
-
     private State state;
     private AID mainAgent;
     private int myId, opponentId;
-    private int N, R;
-    private float stockSellFee;
+    private int R;
+    private int currentRound;
+    // Tampoco nos hace falta, ya la aprende por la diff con MainAgent
+    // private float stockSellFee;
     private ACLMessage msg;
 
     // Add these new instance variables
@@ -41,9 +31,6 @@ public class RL_Agent extends Agent {
     private ArrayList<Float> stocks;
     private ArrayList<Float> stockPrices;
     private ArrayList<Float> inflationRates;
-    // Toda la historia de todas las partidas contra cada oponente, incluyendo
-    // nuestras y sus acciones
-    private HashMap<Integer, ArrayList<Partida>> history;
 
     // -----------------------------------------------------------
     // 1) Add new RL-related instance variables
@@ -73,7 +60,6 @@ public class RL_Agent extends Agent {
         stocks = new ArrayList<>();
         stockPrices = new ArrayList<>();
         inflationRates = new ArrayList<>();
-        history = new HashMap<>();
 
         // 2) Initialize RL collections
         oVStateActions = new Vector<>();
@@ -109,10 +95,6 @@ public class RL_Agent extends Agent {
 
     private enum State {
         waitConfig, waitGame, waitAction, waitResults, waitAccounting
-    }
-
-    private String getRandomAction() {
-        return new Random().nextBoolean() ? "C" : "D";
     }
 
     private void printColored(String text) {
@@ -240,8 +222,9 @@ public class RL_Agent extends Agent {
 
                 float currentMoney = money.get(money.size() - 1);
                 // Decide fractions to buy or sell
-                float buyFraction = 0.1f;
-                float sellFraction = 0.1f;
+                // jugar mas agresivo al principio
+                float buyFraction = 1.0f - (float) currentRound / R;
+                float sellFraction = 1.0f - (float) currentRound / R;
                 float amount = 0f;
 
                 if (bsAction.equals("Buy")) {
@@ -253,6 +236,9 @@ public class RL_Agent extends Agent {
                 accountingMsg.setContent(bsAction + "#" + amount);
                 printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                 send(accountingMsg);
+
+                // aadir ronda
+                currentRound++;
             } else {
                 throw new IllegalArgumentException("Invalid RoundOver message format");
             }
@@ -367,16 +353,6 @@ public class RL_Agent extends Agent {
                     throw new IllegalArgumentException("Player ID not found in Results message");
                 }
 
-                // Store the game outcome
-                Partida partida = new Partida(GameAction.valueOf(actions[myIndex]),
-                        GameAction.valueOf(actions[oppIndex]));
-
-                // Initialize history for this opponent if needed
-                if (!history.containsKey(opponentId)) {
-                    history.put(opponentId, new ArrayList<>());
-                }
-                history.get(opponentId).add(partida);
-
                 // 4) After parsing payoffs[myIndex]
                 double reward = Double.parseDouble(payoffs[myIndex]);
                 vGetNewActionAutomata("Opponent" + opponentId, iNumActions, reward);
@@ -402,14 +378,17 @@ public class RL_Agent extends Agent {
                 return false;
             }
             int tMyId = Integer.parseInt(parts[1]);
-            int tN = Integer.parseInt(params[0]);
+            // N nos da igual
+            // int tN = Integer.parseInt(params[0]);
             int tR = Integer.parseInt(params[1]);
-            float tS = Float.parseFloat(params[2]);
+            // float tS = Float.parseFloat(params[2]);
 
             // At this point everything should be fine, updating class variables
             mainAgent = msg.getSender();
-            N = tN;
-            stockSellFee = tS;
+            // N nos da igual
+            // N = tN;
+            // No nos hace falta, ver declaracion
+            // stockSellFee = tS;
             R = tR;
             myId = tMyId;
             return true;

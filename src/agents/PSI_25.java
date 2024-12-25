@@ -11,8 +11,6 @@ import jade.lang.acl.ACLMessage;
 import java.util.HashMap;
 
 import java.util.ArrayList;
-import java.util.Random;
-import java.util.Vector;
 
 public class PSI_25 extends Agent {
     enum GameAction {
@@ -32,8 +30,9 @@ public class PSI_25 extends Agent {
     private State state;
     private AID mainAgent;
     private int myId, opponentId;
-    private int N, R;
+    private int R;
     private float stockSellFee;
+    private int currentRound;
     private ACLMessage msg;
 
     // Add these new instance variables
@@ -206,7 +205,6 @@ public class PSI_25 extends Agent {
                 ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
                 accountingMsg.addReceiver(mainAgent);
 
-                // TODO:
                 // if the %difference between last stockPrices and second to last stockPrices is
                 // positive and greater than %current inflation, Buy with all our money. Else
                 // sell everything
@@ -222,16 +220,23 @@ public class PSI_25 extends Agent {
                 float diffPercent = ((lastPrice - prevPrice) / prevPrice) * 100;
                 float currentInflation = inflationRates.get(inflationRates.size() - 1);
 
-                if (diffPercent > currentInflation && diffPercent > 0) {
-                    // Buy with all money
-                    accountingMsg.setContent("Buy#" + money.get(money.size() - 1));
+                float buyFraction = 1.0f - (float) currentRound / R;
+                float sellFraction = 1.0f - (float) currentRound / R;
+                float buyAmount = money.get(money.size() - 1) * buyFraction;
+                float sellAmount = stocks.get(stocks.size() - 1) * sellFraction;
+
+                if ((diffPercent + stockSellFee) > currentInflation && diffPercent > 0) {
+                    // be more aggressive at the beggining
+                    accountingMsg.setContent("Buy#" + buyAmount);
                 } else {
-                    // Sell everything
-                    accountingMsg.setContent("Sell#" + stocks.get(stocks.size() - 1));
+                    // same as buy
+                    accountingMsg.setContent("Sell#" + sellAmount);
                 }
 
                 printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                 send(accountingMsg);
+
+                currentRound++;
             } else {
                 throw new IllegalArgumentException("Invalid RoundOver message format");
             }
@@ -242,6 +247,8 @@ public class PSI_25 extends Agent {
             txMsg.addReceiver(mainAgent);
 
             // Analyze last 10 opponent actions
+            // TODO: check if he played D because we played D in the last round or if we
+            // played C in the last and he betrayed us
             try {
                 ArrayList<Partida> opponentHistory = history.get(opponentId);
                 int cooperateCount = 0;
@@ -356,13 +363,11 @@ public class PSI_25 extends Agent {
                 return false;
             }
             int tMyId = Integer.parseInt(parts[1]);
-            int tN = Integer.parseInt(params[0]);
             int tR = Integer.parseInt(params[1]);
             float tS = Float.parseFloat(params[2]);
 
             // At this point everything should be fine, updating class variables
             mainAgent = msg.getSender();
-            N = tN;
             stockSellFee = tS;
             R = tR;
             myId = tMyId;
