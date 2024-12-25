@@ -153,7 +153,7 @@ public class GUI extends JFrame {
 
         // Set N to number of agent types (1 agent per type)
         int totalAgents = agentNames.size();
-        MainAgent.setGameParameters(new GameParametersStruct(totalAgents, params.R, params.S));
+        MainAgent.setGameN(totalAgents);
         nSpinner.setValue(totalAgents);
 
         for (int i = 0; i < agentNames.size(); i++) {
@@ -161,12 +161,12 @@ public class GUI extends JFrame {
             agentPanel.add(new JLabel(agentNames.get(i)), BorderLayout.WEST);
 
             // Default value is 1 for each agent type
-            JSpinner agentSpinner = new JSpinner(new SpinnerNumberModel(1, 0, 100, 1));
+            JSpinner agentSpinner = new JSpinner(new SpinnerNumberModel(1, 0, 1000, 1));
             agentSpinner.addChangeListener(e -> {
                 // Only update when agent counts change
                 int total = getTotalAgentsFromSpinners();
                 nSpinner.setValue(total);
-                MainAgent.setGameParameters(new GameParametersStruct(total, params.R, params.S));
+                MainAgent.setGameN(total);
             });
 
             agentPanel.add(agentSpinner, BorderLayout.EAST);
