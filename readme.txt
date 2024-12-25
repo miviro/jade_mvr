@@ -30,7 +30,7 @@ To compile:
 
 To execute:
     Windows:
-        java -classpath "lib/*;bin/" jade.Boot -notmp -gui -agents "MainAgent:src.jade_mvr.MainAgent; "
+        java -classpath "lib/*;bin/" jade.Boot -notmp -gui -agents "MainAgent:src.jade_mvr.MainAgent; "c
     Linux/Mac:
         java -classpath "lib/*:bin/" jade.Boot -notmp -gui -agents "MainAgent:src.jade_mvr.MainAgent; "
 
@@ -39,5 +39,8 @@ Notes:
     - We only run the MainAgent, which will be in charge of starting and killing new agents as requested by the user.
     - Agents participating in the tournaments should have its .java file placed on the src/agents/ folder.
     - Java 17 is required.
+    - Do not run it in VSCode, it will crash with many rounds and/or agents.
+    - Sending command output to /dev/null will help with performance.
+
 
 Miguel Vila Rodríguez, 11-2024
