@@ -471,9 +471,6 @@ public class NN_Agent extends Agent {
                     throw new IllegalArgumentException("Player ID not found in Results message");
                 }
 
-                // Use payoff as reward to train SOM
-                double reward = Double.parseDouble(payoffs[myIndex]);
-                double normalizedReward = reward / 10.0; // Normalize reward
 
                 // Safety checks to prevent IndexOutOfBoundsException
                 double moneyValue = !money.isEmpty() ? money.get(money.size() - 1) : 0.0;
