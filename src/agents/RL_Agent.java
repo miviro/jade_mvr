@@ -539,7 +539,6 @@ public class RL_Agent extends Agent {
 
                 // Find my position (first or second)
                 int myIndex = (myId == id1) ? 0 : 1;
-                int oppIndex = 1 - myIndex;
 
                 if (opponentId != id1 && opponentId != id2) {
                     throw new IllegalArgumentException("Opponent ID not found in Results message");

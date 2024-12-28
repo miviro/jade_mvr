@@ -45,6 +45,9 @@ public class NN_Agent extends Agent {
     private SOM somStockMarket;
     private SOM somPrisonersDilemma;
 
+    // Store last 20 opponent actions
+    private ArrayList<String> opponentActions;
+
     protected void setup() {
         state = State.waitConfig;
 
@@ -54,12 +57,14 @@ public class NN_Agent extends Agent {
         stockPrices = new ArrayList<>();
         inflationRates = new ArrayList<>();
 
+        opponentActions = new ArrayList<>();
+
         // Initialize the SOM with chosen parameters
         int inputSize = 4; // Example input size
         somStockMarket = new SOM(gridSide, inputSize); // Initialize SOM
         somStockMarket.vResetValues(); // Reset SOM grid
 
-        somPrisonersDilemma = new SOM(gridSide, inputSize); // Initialize SOM
+        somPrisonersDilemma = new SOM(gridSide, 20); // Initialize SOM
         somPrisonersDilemma.vResetValues(); // Reset SOM grid
 
         // Initialize lists with default values to prevent IndexOutOfBoundsException
@@ -331,48 +336,23 @@ public class NN_Agent extends Agent {
             ACLMessage txMsg = new ACLMessage(ACLMessage.INFORM);
             txMsg.addReceiver(mainAgent);
 
-            // Normalize input values
-            double[] inputVector = new double[] {
-                    money.get(money.size() - 1) / maxMoney,
-                    stocks.get(stocks.size() - 1) / maxStocks,
-                    stockPrices.get(stockPrices.size() - 1) / maxStockPrice,
-                    inflationRates.get(inflationRates.size() - 1) / maxInflation
-            };
+            // Build a 20-element input vector
+            double[] inputVector = new double[20];
+            for (int i = 0; i < 20; i++) {
+                inputVector[i] = 0.5; // Default
+            }
+            int index = 0;
+            int startIndex = Math.max(0, opponentActions.size() - 20);
+            for (int i = startIndex; i < opponentActions.size(); i++) {
+                inputVector[index++] = "C".equals(opponentActions.get(i)) ? 1.0 : 0.0;
+            }
 
-            // Use SOM Prisoner's Dilemma
             String bmu = somPrisonersDilemma.sGetBMU(inputVector, true);
             String[] coords = bmu.split(",");
             int x = Integer.parseInt(coords[0]);
-            int y = Integer.parseInt(coords[1]);
 
-            // Improved quadrant-based action mapping to 9 zones
-            String action;
-            if (x < gridSide / 3) {
-                if (y < gridSide / 3) {
-                    action = "C"; // Cooperate Large
-                } else if (y < 2 * gridSide / 3) {
-                    action = "C"; // Cooperate Medium
-                } else {
-                    action = "D"; // Defect Small
-                }
-            } else if (x < 2 * gridSide / 3) {
-                if (y < gridSide / 3) {
-                    action = "C"; // Cooperate Large
-                } else if (y < 2 * gridSide / 3) {
-                    action = "D"; // Defect Medium
-                } else {
-                    action = "D"; // Defect Small
-                }
-            } else {
-                if (y < gridSide / 3) {
-                    action = "C"; // Cooperate Large
-                } else if (y < 2 * gridSide / 3) {
-                    action = "D"; // Defect Medium
-                } else {
-                    action = "D"; // Defect Small
-                }
-            }
-
+            // Only "C" or "D"
+            String action = (x < gridSide / 2) ? "C" : "D";
             txMsg.setContent("Action#" + action);
             send(txMsg);
         }
@@ -460,19 +440,21 @@ public class NN_Agent extends Agent {
                     throw new IllegalArgumentException("Player ID not found in Results message");
                 }
 
-                // Safety checks to prevent IndexOutOfBoundsException
-                double moneyValue = !money.isEmpty() ? money.get(money.size() - 1) : 0.0;
-                double stocksValue = !stocks.isEmpty() ? stocks.get(stocks.size() - 1) : 0.0;
-                double stockPriceValue = !stockPrices.isEmpty() ? stockPrices.get(stockPrices.size() - 1) : 0.0;
-                double inflationRateValue = !inflationRates.isEmpty() ? inflationRates.get(inflationRates.size() - 1)
-                        : 0.0;
+                opponentActions.add(actions[oppIndex]);
+                if (opponentActions.size() > 20) {
+                    opponentActions.remove(0);
+                }
 
-                double[] inputVector = new double[] {
-                        moneyValue / maxMoney,
-                        stocksValue / maxStocks,
-                        stockPriceValue / maxStockPrice,
-                        inflationRateValue / maxInflation
-                };
+                double[] inputVector = new double[20];
+                for (int i = 0; i < 20; i++) {
+                    inputVector[i] = 0.5;
+                }
+                int index = 0;
+                int startIndex = Math.max(0, opponentActions.size() - 20);
+                for (int i = startIndex; i < opponentActions.size(); i++) {
+                    inputVector[index++] = "C".equals(opponentActions.get(i)) ? 1.0 : 0.0;
+                }
+
                 somPrisonersDilemma.sGetBMU(inputVector, true); // Train SOM with input and reward
             } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e) {
                 throw new IllegalArgumentException("Error processing Results: " + e.getMessage());
