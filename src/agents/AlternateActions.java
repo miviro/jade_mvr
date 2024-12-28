@@ -73,9 +73,6 @@ public class AlternateActions extends Agent {
         public void action() {
             msg = blockingReceive();
             if (msg != null) {
-                printColored(
-                        getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName()
-                                + "\n\t State: " + state); // DELETEME
 
                 switch (state) {
                     case waitConfig:
@@ -123,13 +120,11 @@ public class AlternateActions extends Agent {
                                 }
 
                                 accountingMsg.setContent(action + "#" + amount);
-                                printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                                 send(accountingMsg);
                             }
                             state = State.waitAccounting;
                         } else if (msg.getPerformative() == ACLMessage.INFORM
                                 && msg.getContent().startsWith("GameOver")) {
-                            System.out.println("Game Over " + getAID().getName());
                             takeDown();
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
@@ -152,7 +147,6 @@ public class AlternateActions extends Agent {
                                 lastAction = true;
                             }
 
-                            printColored(getAID().getName() + " sent " + msg.getContent());
                             send(msg);
                             state = State.waitResults;
                         } else {
@@ -182,7 +176,6 @@ public class AlternateActions extends Agent {
                         }
                         break;
                 }
-                printColored(getAID().getName() + " is now in state " + state);
             }
         }
 

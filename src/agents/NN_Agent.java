@@ -114,10 +114,6 @@ public class NN_Agent extends Agent {
         public void action() {
             msg = blockingReceive();
             if (msg != null) {
-                printColored(
-                        getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName()
-                                + "\n\t State: " + state); // DELETEME
-
                 switch (state) {
                     case waitConfig:
                         // If INFORM Id#_#_,_,_ PROCESS SETUP --> go to state 1
@@ -150,7 +146,6 @@ public class NN_Agent extends Agent {
                             state = State.waitAccounting;
                         } else if (msg.getPerformative() == ACLMessage.INFORM
                                 && msg.getContent().startsWith("GameOver")) {
-                            System.out.println("Game Over " + getAID().getName());
                             takeDown();
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
@@ -188,7 +183,6 @@ public class NN_Agent extends Agent {
                         }
                         break;
                 }
-                printColored(getAID().getName() + " is now in state " + state);
             }
         }
 
@@ -325,7 +319,6 @@ public class NN_Agent extends Agent {
                 }
 
                 accountingMsg.setContent(bsAction + "#" + amount);
-                printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                 send(accountingMsg);
 
                 currentRound++;
@@ -381,7 +374,6 @@ public class NN_Agent extends Agent {
             }
 
             txMsg.setContent("Action#" + action);
-            printColored(getAID().getName() + " sent " + txMsg.getContent());
             send(txMsg);
         }
 
@@ -418,9 +410,6 @@ public class NN_Agent extends Agent {
                     maxMoney = updatedPayoff;
                 if (updatedAssets > maxStocks)
                     maxStocks = updatedAssets;
-
-                printColored(getAID().getName() + ": Updated payoff=" + updatedPayoff +
-                        ", assets=" + updatedAssets);
 
                 // Normalize input values
                 double[] inputVector = new double[] {
@@ -471,7 +460,6 @@ public class NN_Agent extends Agent {
                     throw new IllegalArgumentException("Player ID not found in Results message");
                 }
 
-
                 // Safety checks to prevent IndexOutOfBoundsException
                 double moneyValue = !money.isEmpty() ? money.get(money.size() - 1) : 0.0;
                 double stocksValue = !stocks.isEmpty() ? stocks.get(stocks.size() - 1) : 0.0;
@@ -486,11 +474,6 @@ public class NN_Agent extends Agent {
                         inflationRateValue / maxInflation
                 };
                 somPrisonersDilemma.sGetBMU(inputVector, true); // Train SOM with input and reward
-
-                printColored(String.format("%s: Round result - My action: %s, Opponent(%d): %s, Payoffs: %s,%s",
-                        getAID().getName(), actions[myIndex], opponentId, actions[oppIndex],
-                        payoffs[myIndex], payoffs[oppIndex]));
-
             } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e) {
                 throw new IllegalArgumentException("Error processing Results: " + e.getMessage());
             }

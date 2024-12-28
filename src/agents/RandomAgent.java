@@ -76,10 +76,6 @@ public class RandomAgent extends Agent {
         public void action() {
             msg = blockingReceive();
             if (msg != null) {
-                printColored(
-                        getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName()
-                                + "\n\t State: " + state); // DELETEME
-
                 switch (state) {
                     case waitConfig:
                         // If INFORM Id#_#_,_,_ PROCESS SETUP --> go to state 1
@@ -126,13 +122,11 @@ public class RandomAgent extends Agent {
                                 }
 
                                 accountingMsg.setContent(action + "#" + amount);
-                                printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                                 send(accountingMsg);
                             }
                             state = State.waitAccounting;
                         } else if (msg.getPerformative() == ACLMessage.INFORM
                                 && msg.getContent().startsWith("GameOver")) {
-                            System.out.println("Game Over " + getAID().getName());
                             takeDown();
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
@@ -147,7 +141,6 @@ public class RandomAgent extends Agent {
                             ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
                             msg.addReceiver(mainAgent);
                             msg.setContent("Action#" + getRandomAction());
-                            printColored(getAID().getName() + " sent " + msg.getContent());
                             send(msg);
                             state = State.waitResults;
                         } else {
@@ -177,7 +170,6 @@ public class RandomAgent extends Agent {
                         }
                         break;
                 }
-                printColored(getAID().getName() + " is now in state " + state);
             }
         }
 

@@ -293,7 +293,7 @@ public class MainAgent extends Agent {
                     receivedMessages.put(sender, msg);
                     String content = msg.getContent();
                     String[] parts = content.split("#");
-                    System.out.println("Received message: " + content);
+                    // System.out.println("Received message: " + content);
                     if (parts.length == 2) {
                         String action = parts[0];
                         float amount;
@@ -709,7 +709,7 @@ public class MainAgent extends Agent {
 
         @Override
         public void action() {
-            System.out.println("GameManager");
+            // System.out.println("GameManager");
             initAgentTypesList();
             view = new GUI();
             view.setVisible(true);
@@ -837,7 +837,7 @@ public class MainAgent extends Agent {
             view.appendLog("Parameters set to: N=" + gameParameters.N + ", S=" + gameParameters.S + ", R="
                     + gameParameters.R, true);
         } catch (Exception e) {
-            System.out.println("Error setting parameters: " + e.getMessage());
+            view.appendLog("Error setting parameters: " + e.getMessage(), false);
         }
     }
 

@@ -149,10 +149,6 @@ public class RL_Agent extends Agent {
         public void action() {
             msg = blockingReceive();
             if (msg != null) {
-                printColored(
-                        getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName()
-                                + "\n\t State: " + state); // DELETEME
-
                 switch (state) {
                     case waitConfig:
                         // If INFORM Id#_#_,_,_ PROCESS SETUP --> go to state 1
@@ -185,7 +181,6 @@ public class RL_Agent extends Agent {
                             state = State.waitAccounting;
                         } else if (msg.getPerformative() == ACLMessage.INFORM
                                 && msg.getContent().startsWith("GameOver")) {
-                            System.out.println("Game Over " + getAID().getName());
                             takeDown();
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
@@ -223,7 +218,6 @@ public class RL_Agent extends Agent {
                         }
                         break;
                 }
-                printColored(getAID().getName() + " is now in state " + state);
             }
         }
 
@@ -272,7 +266,6 @@ public class RL_Agent extends Agent {
                 }
 
                 accountingMsg.setContent(bsAction + "#" + amount);
-                printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                 send(accountingMsg);
 
                 // aadir ronda
@@ -291,7 +284,6 @@ public class RL_Agent extends Agent {
             iLastPdAction = iNewPdAction;
 
             txMsg.setContent("Action#" + action);
-            printColored(getAID().getName() + " sent " + txMsg.getContent());
             send(txMsg);
         }
 
@@ -486,9 +478,6 @@ public class RL_Agent extends Agent {
                 money.add(updatedPayoff);
                 stocks.add(updatedAssets);
 
-                printColored(getAID().getName() + ": Updated payoff=" + updatedPayoff +
-                        ", assets=" + updatedAssets);
-
                 // Once payoff and assets are updated, compute stock reward
                 if (stockPrices.size() >= 2 && inflationRates.size() >= 1 && iLastStockAction != -1) {
                     float lastPrice = stockPrices.get(stockPrices.size() - 2);
@@ -564,11 +553,6 @@ public class RL_Agent extends Agent {
                 dPayoffAction_PD[iLastPdAction] += reward;
                 vGetNewActionAutomata_PD("Opponent" + opponentId, iNumActions, reward);
                 iLastPdAction = iNewPdAction; // Corrected assignment
-
-                printColored(String.format("%s: Round result - My action: %s, Opponent(%d): %s, Payoffs: %s,%s",
-                        getAID().getName(), actions[myIndex], opponentId, actions[oppIndex],
-                        payoffs[myIndex], payoffs[oppIndex]));
-
             } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e) {
                 throw new IllegalArgumentException("Error processing Results: " + e.getMessage());
             }

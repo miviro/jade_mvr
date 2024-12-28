@@ -100,10 +100,6 @@ public class PSI_25 extends Agent {
         public void action() {
             msg = blockingReceive();
             if (msg != null) {
-                printColored(
-                        getAID().getName() + " received " + msg.getContent() + " from " + msg.getSender().getName()
-                                + "\n\t State: " + state); // DELETEME
-
                 switch (state) {
                     case waitConfig:
                         // If INFORM Id#_#_,_,_ PROCESS SETUP --> go to state 1
@@ -136,7 +132,6 @@ public class PSI_25 extends Agent {
                             state = State.waitAccounting;
                         } else if (msg.getPerformative() == ACLMessage.INFORM
                                 && msg.getContent().startsWith("GameOver")) {
-                            System.out.println("Game Over " + getAID().getName());
                             takeDown();
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
@@ -174,7 +169,6 @@ public class PSI_25 extends Agent {
                         }
                         break;
                 }
-                printColored(getAID().getName() + " is now in state " + state);
             }
         }
 
@@ -233,7 +227,6 @@ public class PSI_25 extends Agent {
                     accountingMsg.setContent("Sell#" + sellAmount);
                 }
 
-                printColored(getAID().getName() + " sent " + accountingMsg.getContent());
                 send(accountingMsg);
 
                 currentRound++;
@@ -317,8 +310,6 @@ public class PSI_25 extends Agent {
                 money.add(updatedPayoff);
                 stocks.add(updatedAssets);
 
-                printColored(getAID().getName() + ": Updated payoff=" + updatedPayoff +
-                        ", assets=" + updatedAssets);
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException(getAID().getName() + ": Error parsing accounting values");
             }
