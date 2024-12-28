@@ -10,10 +10,21 @@ import jade.domain.FIPAException;
 import jade.lang.acl.ACLMessage;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class NN_Agent extends Agent {
     enum GameAction {
         C, D
+    }
+
+    private class Partida {
+        public GameAction accionPropia;
+        public GameAction accionOponente;
+
+        public Partida(GameAction accionPropia, GameAction accionOponente) {
+            this.accionPropia = accionPropia;
+            this.accionOponente = accionOponente;
+        }
     }
 
     private State state;
@@ -46,7 +57,7 @@ public class NN_Agent extends Agent {
     private SOM somPrisonersDilemma;
 
     // Store last 20 opponent actions
-    private ArrayList<String> opponentActions;
+    private HashMap<Integer, ArrayList<Partida>> history;
 
     protected void setup() {
         state = State.waitConfig;
@@ -57,7 +68,7 @@ public class NN_Agent extends Agent {
         stockPrices = new ArrayList<>();
         inflationRates = new ArrayList<>();
 
-        opponentActions = new ArrayList<>();
+        history = new HashMap<>();
 
         // Initialize the SOM with chosen parameters
         int inputSize = 4; // Example input size
@@ -341,13 +352,15 @@ public class NN_Agent extends Agent {
             for (int i = 0; i < 20; i++) {
                 inputVector[i] = 0.5; // Default
             }
+            ArrayList<Partida> oppHistory = history.getOrDefault(opponentId, new ArrayList<>());
+            int startIndex = Math.max(0, oppHistory.size() - 20);
             int index = 0;
-            int startIndex = Math.max(0, opponentActions.size() - 20);
-            for (int i = startIndex; i < opponentActions.size(); i++) {
-                inputVector[index++] = "C".equals(opponentActions.get(i)) ? 1.0 : 0.0;
+            for (int i = startIndex; i < oppHistory.size() && index < 20; i++) {
+                GameAction oppAction = oppHistory.get(i).accionOponente;
+                inputVector[index++] = (oppAction == GameAction.C) ? 1.0 : 0.0;
             }
 
-            String bmu = somPrisonersDilemma.sGetBMU(inputVector, true);
+            String bmu = somPrisonersDilemma.sGetBMU(inputVector, false);
             String[] coords = bmu.split(",");
             int x = Integer.parseInt(coords[0]);
 
@@ -440,19 +453,26 @@ public class NN_Agent extends Agent {
                     throw new IllegalArgumentException("Player ID not found in Results message");
                 }
 
-                opponentActions.add(actions[oppIndex]);
-                if (opponentActions.size() > 20) {
-                    opponentActions.remove(0);
+                // Store the game outcome
+                Partida partida = new Partida(GameAction.valueOf(actions[myIndex]),
+                        GameAction.valueOf(actions[oppIndex]));
+
+                // Initialize history for this opponent if needed
+                if (!history.containsKey(opponentId)) {
+                    history.put(opponentId, new ArrayList<>());
                 }
+                history.get(opponentId).add(partida);
 
                 double[] inputVector = new double[20];
                 for (int i = 0; i < 20; i++) {
                     inputVector[i] = 0.5;
                 }
+                ArrayList<Partida> oppHistory = history.getOrDefault(opponentId, new ArrayList<>());
+                int startIndex = Math.max(0, oppHistory.size() - 20);
                 int index = 0;
-                int startIndex = Math.max(0, opponentActions.size() - 20);
-                for (int i = startIndex; i < opponentActions.size(); i++) {
-                    inputVector[index++] = "C".equals(opponentActions.get(i)) ? 1.0 : 0.0;
+                for (int i = startIndex; i < oppHistory.size() && index < 20; i++) {
+                    GameAction oppAction = oppHistory.get(i).accionOponente;
+                    inputVector[index++] = (oppAction == GameAction.C) ? 1.0 : 0.0;
                 }
 
                 somPrisonersDilemma.sGetBMU(inputVector, true); // Train SOM with input and reward
