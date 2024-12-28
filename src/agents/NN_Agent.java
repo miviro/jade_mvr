@@ -39,6 +39,7 @@ public class NN_Agent extends Agent {
     private ArrayList<Float> stocks;
     private ArrayList<Float> stockPrices;
     private ArrayList<Float> inflationRates;
+    private float currentTrend;
 
     // Define maximum sizes for the lists
     private static final int MAX_SIZE = 100;
@@ -71,7 +72,7 @@ public class NN_Agent extends Agent {
         history = new HashMap<>();
 
         // Initialize the SOM with chosen parameters
-        int inputSize = 4; // Example input size
+        int inputSize = 5; // Increased to 5 to accommodate trend
         somStockMarket = new SOM(gridSide, inputSize); // Initialize SOM
         somStockMarket.vResetValues(); // Reset SOM grid
 
@@ -246,16 +247,24 @@ public class NN_Agent extends Agent {
                 if (inflationRate > maxInflation)
                     maxInflation = inflationRate;
 
+                if (stockPrices.size() >= 2) {
+                    float lastPrice = stockPrices.get(stockPrices.size() - 1);
+                    float prevPrice = stockPrices.get(stockPrices.size() - 2);
+                    currentTrend = lastPrice - prevPrice;
+                } else {
+                    currentTrend = 0f;
+                }
+
                 ACLMessage accountingMsg = new ACLMessage(ACLMessage.INFORM);
                 accountingMsg.addReceiver(mainAgent);
 
                 // Normalize input values
-                double[] inputVector = new double[] {
-                        accumulatedPayoff / maxMoney,
-                        currentStocks / maxStocks,
-                        currentStockValue / maxStockPrice,
-                        inflationRate / maxInflation
-                };
+                double[] inputVector = new double[5];
+                inputVector[0] = accumulatedPayoff / maxMoney;
+                inputVector[1] = currentStocks / maxStocks;
+                inputVector[2] = currentStockValue / maxStockPrice;
+                inputVector[3] = inflationRate / maxInflation;
+                inputVector[4] = currentTrend / maxStockPrice; // Simple normalization
 
                 // Use SOM Stock Market
                 String bmu = somStockMarket.sGetBMU(inputVector, true);
@@ -409,7 +418,8 @@ public class NN_Agent extends Agent {
                         updatedPayoff / maxMoney,
                         updatedAssets / maxStocks,
                         stockPrices.get(stockPrices.size() - 1) / maxStockPrice,
-                        inflationRates.get(inflationRates.size() - 1) / maxInflation
+                        inflationRates.get(inflationRates.size() - 1) / maxInflation,
+                        currentTrend / maxStockPrice // Added currentTrend
                 };
 
                 // Use SOM Stock Market with normalized reward

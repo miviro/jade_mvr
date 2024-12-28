@@ -62,6 +62,7 @@ The SOM is a 2D grid of iGridSide. We put random vectors on each neuron to add e
 When a BMU (Best Matching Unit) gets updated, the neurons close to it (iRadio) also get updated. This is decayed through dDecLearnRate. The radio is also decayed.
 WE normalize inputs to train with stable values (not a good idea to use a 100000 as money for training).
 Different stock market actions depending on how much to buy/sell (Buy/Sell Large/Mid/Small). Same for PD but with two outputs (C or D) SOMs.
+Inputs: currentMoney, currentStocks, currentStockPrice, currentInflation, currentStockTrend
 
 PSI_25 explanation:
 Very simple agent that has the same skeleton as the other ones. We use simple heuristics for choosing our actions.
