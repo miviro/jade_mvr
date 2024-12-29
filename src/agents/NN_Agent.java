@@ -79,12 +79,11 @@ public class NN_Agent extends Agent {
         somPrisonersDilemma = new SOM(gridSide, 20); // Initialize SOM
         somPrisonersDilemma.vResetValues(); // Reset SOM grid
 
-        // Initialize lists with default values to prevent IndexOutOfBoundsException
-        money.add(0f); // Initialize money with default value
-        stocks.add(0f); // Initialize stocks with default value
-        stockPrices.add(0f); // Initialize stockPrices with default value
-        inflationRates.add(0f); // Initialize inflationRates with default value
-
+        // default values
+        money.add(0f);
+        stocks.add(0f);
+        stockPrices.add(0f);
+        inflationRates.add(0f);
         // Register in the yellow pages as a player
         DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
@@ -390,11 +389,6 @@ public class NN_Agent extends Agent {
                 if (playerId != myId) {
                     throw new IllegalArgumentException(getAID().getName() + ": Received accounting for wrong player");
                 }
-
-                // Removed all references to updatedPayoff and updatedAssets
-                // Removed additions to money/stocks
-                // Removed updates to maxMoney/maxStocks
-                // Removed input vector logic using updatedPayoff/updatedAssets
 
                 // If you still need to train the SOM, do so without those fields:
                 double[] inputVector = new double[] {
