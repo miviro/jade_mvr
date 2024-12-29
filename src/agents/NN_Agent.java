@@ -72,7 +72,7 @@ public class NN_Agent extends Agent {
         history = new HashMap<>();
 
         // Initialize the SOM with chosen parameters
-        int inputSize = 5; // Increased to 5 to accommodate trend
+        int inputSize = 3; // changed from 5 to 3
         somStockMarket = new SOM(gridSide, inputSize); // Initialize SOM
         somStockMarket.vResetValues(); // Reset SOM grid
 
@@ -259,12 +259,10 @@ public class NN_Agent extends Agent {
                 accountingMsg.addReceiver(mainAgent);
 
                 // Normalize input values
-                double[] inputVector = new double[5];
-                inputVector[0] = accumulatedPayoff / maxMoney;
-                inputVector[1] = currentStocks / maxStocks;
-                inputVector[2] = currentStockValue / maxStockPrice;
-                inputVector[3] = inflationRate / maxInflation;
-                inputVector[4] = currentTrend / maxStockPrice; // Simple normalization
+                double[] inputVector = new double[3];
+                inputVector[0] = currentStockValue / maxStockPrice;
+                inputVector[1] = inflationRate / maxInflation;
+                inputVector[2] = currentTrend / maxStockPrice;
 
                 // Use SOM Stock Market
                 String bmu = somStockMarket.sGetBMU(inputVector, true);
@@ -393,37 +391,18 @@ public class NN_Agent extends Agent {
                     throw new IllegalArgumentException(getAID().getName() + ": Received accounting for wrong player");
                 }
 
-                float updatedPayoff = Float.parseFloat(parts[2]);
-                float updatedAssets = Float.parseFloat(parts[3]);
+                // Removed all references to updatedPayoff and updatedAssets
+                // Removed additions to money/stocks
+                // Removed updates to maxMoney/maxStocks
+                // Removed input vector logic using updatedPayoff/updatedAssets
 
-                // Update current values (removing if exists, then adding)
-                // solo guardoamos los estados dspues de la accion
-                money.add(updatedPayoff);
-                stocks.add(updatedAssets);
-
-                // Limit the size of the lists
-                if (money.size() > MAX_SIZE)
-                    money.remove(0);
-                if (stocks.size() > MAX_SIZE)
-                    stocks.remove(0);
-
-                // Update maximum values dynamically
-                if (updatedPayoff > maxMoney)
-                    maxMoney = updatedPayoff;
-                if (updatedAssets > maxStocks)
-                    maxStocks = updatedAssets;
-
-                // Normalize input values
+                // If you still need to train the SOM, do so without those fields:
                 double[] inputVector = new double[] {
-                        updatedPayoff / maxMoney,
-                        updatedAssets / maxStocks,
                         stockPrices.get(stockPrices.size() - 1) / maxStockPrice,
                         inflationRates.get(inflationRates.size() - 1) / maxInflation,
-                        currentTrend / maxStockPrice // Added currentTrend
+                        currentTrend / maxStockPrice
                 };
-
-                // Use SOM Stock Market with normalized reward
-                somStockMarket.sGetBMU(inputVector, true); // Train SOM with new input and default reward
+                somStockMarket.sGetBMU(inputVector, true);
 
             } catch (NumberFormatException e) {
                 throw new IllegalArgumentException(getAID().getName() + ": Error parsing accounting values");
