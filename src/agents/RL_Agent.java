@@ -47,7 +47,6 @@ public class RL_Agent extends Agent {
     StateAction oLastStateAction;
     double dLearnRate = 0.5;
     private int iLastStockAction = -1; // store last chosen stock action
-    private int consecutiveFailingBuys = 0; // Track consecutive failing buys
 
     // Separate “last-action” variables
     private int iLastPdAction;
@@ -76,6 +75,9 @@ public class RL_Agent extends Agent {
     private double[] dProbAction_Stock = new double[iNumActions];
     private double[] dPayoffAction_PD = new double[iNumActions];
     private double[] dPayoffAction_Stock = new double[iNumActions];
+
+    // Add an exploration parameter:
+    private double dEpsilon = 0.1; // 10% random exploration
 
     protected void setup() {
         state = State.waitConfig;
@@ -331,11 +333,17 @@ public class RL_Agent extends Agent {
             // Action selection for PD
             double dValAcc = 0;
             double dValRandom = Math.random();
-            for (int i = 0; i < iNActions; i++) {
-                dValAcc += oPresentStateAction.dValAction[i];
-                if (dValRandom < dValAcc) {
-                    iNewPdAction = i;
-                    break;
+
+            // Add ε-greedy exploration:
+            if (dValRandom < dEpsilon) {
+                iNewPdAction = (Math.random() < 0.5) ? 0 : 1;
+            } else {
+                for (int i = 0; i < iNActions; i++) {
+                    dValAcc += oPresentStateAction.dValAction[i];
+                    if (dValRandom < dValAcc) {
+                        iNewPdAction = i;
+                        break;
+                    }
                 }
             }
             oLastStateAction_PD = oPresentStateAction;
@@ -349,57 +357,6 @@ public class RL_Agent extends Agent {
 
         // Separate RL methods for Stock
         public void vGetNewActionAutomata_Stock(String sState, int iNActions, double dReward) {
-            if (consecutiveFailingBuys >= 3) {
-                iNewStockAction = 1; // Force Sell
-                consecutiveFailingBuys = 0; // Reset counter
-                // Update Q-value for forced action
-                boolean bFound = false;
-                for (StateAction sa : oVStateActions_Stock) {
-                    if (sa.sState.equals(sState)) {
-                        oPresentStateAction = sa;
-                        bFound = true;
-                        break;
-                    }
-                }
-                if (!bFound) {
-                    oPresentStateAction = new StateAction(sState, iNActions, true);
-                    oVStateActions_Stock.add(oPresentStateAction);
-                }
-                if (oLastStateAction_Stock != null) {
-                    double adjustedReward = dReward; // Assuming stockReward is already scaled appropriately
-
-                    if (adjustedReward > 0) {
-                        for (int i = 0; i < iNActions; i++) {
-                            if (i == iLastStockAction) {
-                                oLastStateAction_Stock.dValAction[i] += dLearnRate_Stock
-                                        * (adjustedReward - oLastStateAction_Stock.dValAction[i]);
-                            } else {
-                                oLastStateAction_Stock.dValAction[i] *= (1.0 - dLearnRate_Stock * adjustedReward);
-                            }
-                        }
-                    } else {
-                        // If reward <= 0, punish last action more strongly
-                        for (int i = 0; i < iNActions; i++) {
-                            if (i == iLastStockAction) {
-                                oLastStateAction_Stock.dValAction[i] *= (1.0 - dLearnRate_Stock * 0.8); // Stronger
-                                                                                                        // punishment
-                            }
-                        }
-                    }
-                }
-
-                // Select forced action
-                // No random selection needed
-                oLastStateAction_Stock = oPresentStateAction;
-                dLearnRate_Stock *= dDecFactorLR;
-                if (dLearnRate_Stock < dMINLearnRate)
-                    dLearnRate_Stock = dMINLearnRate;
-
-                // Increment Stock action count
-                iNumTimesAction_Stock[iNewStockAction]++;
-                return; // Exit to enforce forced sell
-            }
-
             // Normal action selection
             boolean bFound = false;
             for (StateAction sa : oVStateActions_Stock) {
@@ -439,12 +396,18 @@ public class RL_Agent extends Agent {
 
             // Action selection
             double dValAcc = 0;
-            double dValRandom = Math.random();
-            for (int i = 0; i < iNActions; i++) {
-                dValAcc += oPresentStateAction.dValAction[i];
-                if (dValRandom < dValAcc) {
-                    iNewStockAction = i;
-                    break;
+            double dValRandom2 = Math.random();
+
+            // Add ε-greedy exploration:
+            if (dValRandom2 < dEpsilon) {
+                iNewStockAction = (Math.random() < 0.5) ? 0 : 1;
+            } else {
+                for (int i = 0; i < iNActions; i++) {
+                    dValAcc += oPresentStateAction.dValAction[i];
+                    if (dValRandom2 < dValAcc) {
+                        iNewStockAction = i;
+                        break;
+                    }
                 }
             }
             oLastStateAction_Stock = oPresentStateAction;
@@ -488,16 +451,8 @@ public class RL_Agent extends Agent {
 
                     double stockReward = 0.0;
                     if (iLastStockAction == 0 && priceChange < inflationRate) {
-                        consecutiveFailingBuys++;
-                        stockReward = -3.0 * consecutiveFailingBuys; // further stronger penalty
-                        // Prevent buying after 3 consecutive failing buys
-                        if (consecutiveFailingBuys >= 3) {
-                            // Force action to Sell
-                            iNewStockAction = 1;
-                            stockReward = 2.0; // reward for forced sell
-                        }
+                        stockReward = -1.0;
                     } else if (iLastStockAction == 0) {
-                        consecutiveFailingBuys = 0;
                         stockReward = 0.3; // slightly increased positive reward
                     } else if (iLastStockAction == 1 && priceChange < inflationRate) {
                         stockReward = 1.5; // increased reward for selling in a downward environment
