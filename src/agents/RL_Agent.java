@@ -79,6 +79,9 @@ public class RL_Agent extends Agent {
     // Add an exploration parameter:
     private double dEpsilon = 0.1; // 10% random exploration
 
+    // Add a short history size for trend detection:
+    private final int iTrendWindow = 3;
+
     protected void setup() {
         state = State.waitConfig;
 
@@ -394,6 +397,16 @@ public class RL_Agent extends Agent {
                 }
             }
 
+            // Use computeTrend to slightly modify reward or bias action
+            float trend = computeTrend();
+            if (trend > 0f && iNewStockAction == 0) {
+                // decrease reward if we're buying near top intentionally
+                dReward -= 1;
+            } else if (trend < 0f && iNewStockAction == 1) {
+                // Possibly reduce reward if we're selling at a low
+                dReward -= 1;
+            }
+
             // Action selection
             double dValAcc = 0;
             double dValRandom2 = Math.random();
@@ -644,5 +657,24 @@ public class RL_Agent extends Agent {
                 }
             }
         }
+    }
+
+    private float computeTrend() {
+        // If fewer than iTrendWindow prices, return neutral
+        if (stockPrices.size() < iTrendWindow)
+            return 0f;
+
+        float sum = 0f;
+        for (int i = stockPrices.size() - iTrendWindow; i < stockPrices.size(); i++) {
+            sum += stockPrices.get(i);
+        }
+        float avg = sum / iTrendWindow;
+        float latest = stockPrices.get(stockPrices.size() - 1);
+        if (latest > avg) {
+            return 1f; // near top
+        } else if (latest < avg) {
+            return -1f; // near bottom
+        }
+        return 0f; // neutral
     }
 }
