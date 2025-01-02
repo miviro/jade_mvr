@@ -45,8 +45,6 @@ public class NN_Agent extends Agent {
     private static final int MAX_SIZE = 100;
 
     // Define dynamic maximum values for normalization
-    private float maxMoney = 10000f;
-    private float maxStocks = 1000f;
     private float maxStockPrice = 1000f;
     private float maxInflation = 10f;
 
@@ -237,10 +235,6 @@ public class NN_Agent extends Agent {
                     inflationRates.remove(0);
 
                 // Update maximum values dynamically
-                if (accumulatedPayoff > maxMoney)
-                    maxMoney = accumulatedPayoff;
-                if (currentStocks > maxStocks)
-                    maxStocks = currentStocks;
                 if (currentStockValue > maxStockPrice)
                     maxStockPrice = currentStockValue;
                 if (inflationRate > maxInflation)
