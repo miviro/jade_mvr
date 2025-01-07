@@ -184,11 +184,11 @@ public class PSI_25 extends Agent {
                     throw new IllegalArgumentException("Player ID does not match");
                 }
                 @SuppressWarnings("unused")
-                Float roundPayoff = Float.parseFloat(parts[2]);
-                Float accumulatedPayoff = Float.parseFloat(parts[3]);
-                Float inflationRate = Float.parseFloat(parts[4]);
-                Float currentStocks = Float.parseFloat(parts[5]);
-                Float currentStockValue = Float.parseFloat(parts[6]);
+                Float roundPayoff = Float.valueOf(parts[2]);
+                Float accumulatedPayoff = Float.valueOf(parts[3]);
+                Float inflationRate = Float.valueOf(parts[4]);
+                Float currentStocks = Float.valueOf(parts[5]);
+                Float currentStockValue = Float.valueOf(parts[6]);
 
                 // Update current values (removing if exists, then adding)
                 money.add(accumulatedPayoff);

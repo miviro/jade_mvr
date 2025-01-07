@@ -212,11 +212,11 @@ public class NN_Agent extends Agent {
                     throw new IllegalArgumentException("Player ID does not match");
                 }
                 @SuppressWarnings("unused")
-                Float roundPayoff = Float.parseFloat(parts[2]);
-                Float accumulatedPayoff = Float.parseFloat(parts[3]);
-                Float inflationRate = Float.parseFloat(parts[4]);
-                Float currentStocks = Float.parseFloat(parts[5]);
-                Float currentStockValue = Float.parseFloat(parts[6]);
+                Float roundPayoff = Float.valueOf(parts[2]);
+                Float accumulatedPayoff = Float.valueOf(parts[3]);
+                Float inflationRate = Float.valueOf(parts[4]);
+                Float currentStocks = Float.valueOf(parts[5]);
+                Float currentStockValue = Float.valueOf(parts[6]);
 
                 // Update current values (removing if exists, then adding)
                 money.add(accumulatedPayoff);
@@ -301,37 +301,38 @@ public class NN_Agent extends Agent {
                 if (sellFraction > 1.0f) {
                     sellFraction = 1.0f;
                 }
-                float amount = 0f;
+                float amount;
 
                 switch (bsAction) {
-                    case "Buy Large":
+                    case "Buy Large" -> {
                         bsAction = "Buy";
                         amount = buyFraction * currentMoney;
-                        break;
-                    case "Buy Medium":
+                    }
+                    case "Buy Medium" -> {
                         bsAction = "Buy";
                         amount = buyFraction * currentMoney / 10;
-                        break;
-                    case "Buy Small":
+                    }
+                    case "Buy Small" -> {
                         bsAction = "Buy";
                         amount = buyFraction * currentMoney / 100;
-                        break;
-                    case "Sell Large":
+                    }
+                    case "Sell Large" -> {
                         bsAction = "Sell";
                         amount = sellFraction * currentStocks;
-                        break;
-                    case "Sell Medium":
+                    }
+                    case "Sell Medium" -> {
                         bsAction = "Sell";
                         amount = sellFraction * currentStocks / 10;
-                        break;
-                    case "Sell Small":
+                    }
+                    case "Sell Small" -> {
                         bsAction = "Sell";
                         amount = sellFraction * currentStocks / 100;
-                        break;
-                    default: // Hold
+                    }
+                    default -> {
+                        // Hold
                         bsAction = "Buy";
                         amount = 0f;
-                        break;
+                    }
                 }
 
                 accountingMsg.setContent(bsAction + "#" + amount);
@@ -503,17 +504,16 @@ public class NN_Agent extends Agent {
     }
 
     // Add the SOM class definition
-    public class SOM {
-        private int iGridSide; // Side of the SOM 2D grid
+    public final class SOM {
+        private final int iGridSide; // Side of the SOM 2D grid
         private int[][] iNumTimesBMU; // Number of times a cell has been a BMU
-        private int[] iBMU_Pos = new int[2]; // BMU position in the grid
 
-        private int iInputSize; // Size of the input vector
+        private final int iInputSize; // Size of the input vector
         private int iRadio; // BMU radio to modify neurons
         private double dLearnRate = 1.0; // Learning rate for this SOM
-        private double dDecLearnRate = 0.999; // Used to reduce the learning rate
+        private final double dDecLearnRate = 0.999; // Used to reduce the learning rate
         private double[] dBMU_Vector = null; // BMU state
-        private double[][][] dGrid; // SOM square grid + vector state per neuron
+        private final double[][][] dGrid; // SOM square grid + vector state per neuron
 
         /**
          * This is the class constructor that creates the 2D SOM grid
@@ -536,8 +536,6 @@ public class NN_Agent extends Agent {
         public void vResetValues() {
             dLearnRate = 1.0;
             iNumTimesBMU = new int[iGridSide][iGridSide];
-            iBMU_Pos[0] = -1;
-            iBMU_Pos[1] = -1;
 
             for (int i = 0; i < iGridSide; i++) // Initializing the SOM grid/network
                 for (int j = 0; j < iGridSide; j++)
@@ -584,8 +582,8 @@ public class NN_Agent extends Agent {
                 } // Leaving the loop with the x,y positions for the BMU
 
             if (bTrain) {
-                int xAux = 0;
-                int yAux = 0;
+                int xAux;
+                int yAux;
 
                 for (int v = -iRadio; v <= iRadio; v++) // Adjusting the neighborhood
                     for (int h = -iRadio; h <= iRadio; h++) {
@@ -614,8 +612,7 @@ public class NN_Agent extends Agent {
             }
 
             sReturn = "" + x + "," + y;
-            iBMU_Pos[0] = x;
-            iBMU_Pos[1] = y;
+
             dBMU_Vector = dGrid[x][y].clone();
             iNumTimesBMU[x][y]++;
             dLearnRate *= dDecLearnRate;

@@ -34,18 +34,9 @@ public class RL_Agent extends Agent {
 
     final double dDecFactorLR = 0.9999;
     final double dMINLearnRate = 0.05;
-    boolean bAllActions = false;
     int iNumActions = 2; // For "C" or "D"
-    int iNewAction;
     int iNewStockAction; // For "Buy" or "Sell" if needed
-    int iLastAction;
-    int[] iNumTimesAction = new int[iNumActions];
-    double[] dPayoffAction = new double[iNumActions];
-    double[] dProbAction = new double[iNumActions];
-    Vector<StateAction> oVStateActions;
     StateAction oPresentStateAction;
-    StateAction oLastStateAction;
-    double dLearnRate = 0.5;
     private int iLastStockAction = -1; // store last chosen stock action
 
     // Separate “last-action” variables
@@ -65,8 +56,8 @@ public class RL_Agent extends Agent {
     private double dLearnRate_Stock = 0.5;
 
     // Separate action count arrays
-    private int[] iNumTimesAction_PD = new int[iNumActions];
-    private int[] iNumTimesAction_Stock = new int[iNumActions];
+    private final int[] iNumTimesAction_PD = new int[iNumActions];
+    private final int[] iNumTimesAction_Stock = new int[iNumActions];
 
     // Add these new instance variables
     private boolean bAllActions_PD = false;
@@ -77,7 +68,7 @@ public class RL_Agent extends Agent {
     private double[] dPayoffAction_Stock = new double[iNumActions];
 
     // Add an exploration parameter:
-    private double dEpsilon = 0.1; // 10% random exploration
+    private final double dEpsilon = 0.1; // 10% random exploration
 
     // Add a short history size for trend detection:
     private final int iTrendWindow = 3;
@@ -90,9 +81,6 @@ public class RL_Agent extends Agent {
         stocks = new ArrayList<>();
         stockPrices = new ArrayList<>();
         inflationRates = new ArrayList<>();
-
-        // 2) Initialize RL collections
-        oVStateActions = new Vector<>();
 
         // Initialize separate RL collections
         oVStateActions_PD = new Vector<>();
@@ -134,7 +122,6 @@ public class RL_Agent extends Agent {
         }
 
         System.out.println("RL_Agent " + getAID().getName() + " terminating.");
-        System.exit(0);
     }
 
     private enum State {
@@ -155,7 +142,7 @@ public class RL_Agent extends Agent {
             msg = blockingReceive();
             if (msg != null) {
                 switch (state) {
-                    case waitConfig:
+                    case waitConfig -> {
                         // If INFORM Id#_#_,_,_ PROCESS SETUP --> go to state 1
                         // Else ERROR
                         if (msg.getContent().startsWith("Id#")) {
@@ -169,8 +156,8 @@ public class RL_Agent extends Agent {
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
                         }
-                        break;
-                    case waitGame:
+                    }
+                    case waitGame -> {
                         // If INFORM NewGame ----> waitAction
                         // If REQUEST RoundOver -> waitAccounting
                         // If INFORM GameOver ---> end the program
@@ -190,9 +177,9 @@ public class RL_Agent extends Agent {
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
                         }
-                        break;
+                    }
 
-                    case waitAction:
+                    case waitAction -> {
                         // If REQUEST ACTION --> waitResults
                         // Else ERROR
                         if (msg.getPerformative() == ACLMessage.REQUEST && msg.getContent().startsWith("Action")) {
@@ -201,8 +188,8 @@ public class RL_Agent extends Agent {
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
                         }
-                        break;
-                    case waitResults:
+                    }
+                    case waitResults -> {
                         // If INFORM RESULTS --> waitGame
                         // Else ERROR
                         if (msg.getPerformative() == ACLMessage.INFORM && msg.getContent().startsWith("Results#")) {
@@ -211,8 +198,8 @@ public class RL_Agent extends Agent {
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
                         }
-                        break;
-                    case waitAccounting:
+                    }
+                    case waitAccounting -> {
                         // If INFORM Accounting --> waitGame
                         // Else ERROR
                         if (msg.getPerformative() == ACLMessage.INFORM && msg.getContent().startsWith("Accounting#")) {
@@ -221,7 +208,7 @@ public class RL_Agent extends Agent {
                         } else {
                             printColored(getAID().getName() + ":" + state.name() + " - Unexpected message");
                         }
-                        break;
+                    }
                 }
             }
         }
@@ -238,11 +225,11 @@ public class RL_Agent extends Agent {
                     throw new IllegalArgumentException("Player ID does not match");
                 }
                 @SuppressWarnings("unused")
-                Float roundPayoff = Float.parseFloat(parts[2]);
-                Float accumulatedPayoff = Float.parseFloat(parts[3]);
-                Float inflationRate = Float.parseFloat(parts[4]);
-                Float currentStocks = Float.parseFloat(parts[5]);
-                Float currentStockValue = Float.parseFloat(parts[6]);
+                Float roundPayoff = Float.valueOf(parts[2]);
+                Float accumulatedPayoff = Float.valueOf(parts[3]);
+                Float inflationRate = Float.valueOf(parts[4]);
+                Float currentStocks = Float.valueOf(parts[5]);
+                Float currentStockValue = Float.valueOf(parts[6]);
 
                 // Update current values (removing if exists, then adding)
                 money.add(accumulatedPayoff);
@@ -262,7 +249,7 @@ public class RL_Agent extends Agent {
                 // jugar mas agresivo al principio
                 float buyFraction = 1.0f - (float) currentRound / R;
                 float sellFraction = 1.0f - (float) currentRound / R;
-                float amount = 0f;
+                float amount;
 
                 if (bsAction.equals("Buy")) {
                     amount = (buyFraction * currentMoney);
@@ -373,17 +360,29 @@ public class RL_Agent extends Agent {
                 oPresentStateAction = new StateAction(sState, iNActions, true);
                 oVStateActions_Stock.add(oPresentStateAction);
             }
-            if (oLastStateAction_Stock != null) {
-                // Scale rewards for Stock
-                double adjustedReward = dReward; // Assuming stockReward is already scaled appropriately
 
-                if (adjustedReward > 0) {
+            // Use computeTrend to adjust reward or influence action selection
+            float trend = computeTrend();
+            if (trend > 0f && iNewStockAction == 0) {
+                // Penalize buying when trend is positive (overbought)
+                dReward -= 1;
+            } else if (trend < 0f && iNewStockAction == 1) {
+                // Penalize selling when trend is negative (oversold)
+                dReward -= 1;
+            }
+
+            // Optionally, incorporate trend into reward scaling
+            dReward *= (1 + trend * 0.1); // Slightly scale reward based on trend
+
+            if (oLastStateAction_Stock != null) {
+                // Scale rewards for Stock using the modified dReward
+                if (dReward > 0) {
                     for (int i = 0; i < iNActions; i++) {
                         if (i == iLastStockAction) {
                             oLastStateAction_Stock.dValAction[i] += dLearnRate_Stock
-                                    * (adjustedReward - oLastStateAction_Stock.dValAction[i]);
+                                    * (dReward - oLastStateAction_Stock.dValAction[i]);
                         } else {
-                            oLastStateAction_Stock.dValAction[i] *= (1.0 - dLearnRate_Stock * adjustedReward);
+                            oLastStateAction_Stock.dValAction[i] *= (1.0 - dLearnRate_Stock * dReward);
                         }
                     }
                 } else {
@@ -397,17 +396,7 @@ public class RL_Agent extends Agent {
                 }
             }
 
-            // Use computeTrend to slightly modify reward or bias action
-            float trend = computeTrend();
-            if (trend > 0f && iNewStockAction == 0) {
-                // decrease reward if we're buying near top intentionally
-                dReward -= 1;
-            } else if (trend < 0f && iNewStockAction == 1) {
-                // Possibly reduce reward if we're selling at a low
-                dReward -= 1;
-            }
-
-            // Action selection
+            // Action selection remains the same
             double dValAcc = 0;
             double dValRandom2 = Math.random();
 
